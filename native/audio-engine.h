@@ -30,7 +30,7 @@
 // Per-track soundfont voice state (shares soundfonts[sfSlot].handle via MIDI channels).
 // 9 voices: song tracks 0-7 plus the dedicated preview lane (track 8 == AudioEngine::PREVIEW_LANE
 // == Kotlin PREVIEW_TRACK_ID), so SF instrument previews never touch song tracks.
-// Declared here so audio-engine.cpp and jni-bridge.cpp can reference sfVoices[].
+// Defined in audio-engine.cpp; declared here for the engine-*.cpp files that share it.
 static const int SF_VOICE_COUNT = 9;
 extern SoundfontVoice sfVoices[SF_VOICE_COUNT];
 
@@ -771,11 +771,10 @@ public:
     // paths (audio thread only).
     void effectiveTicRatesFor(int tableId, int fallback, int out[TABLE_LANES]);
 
-    // Unified per-voice table tick (tic advance + row FX processing) for sampler AND SF
-    // voices — was two drifted ~90-line copies. Duck-typed template over the identical
-    // table-state fields; the two per-type differences (KIL semantics, OFFSET) resolve at
-    // compile time via the tableKill/tableOffset overloads in audio-engine.cpp, where the
-    // template is defined and (implicitly) instantiated.
+    // Unified per-voice table tick (tic advance + row FX processing) for sampler AND SF voices.
+    // Duck-typed template over the identical table-state fields; the two per-type differences (KIL
+    // semantics, OFFSET) resolve at compile time via the tableKill/tableOffset overloads
+    // (engine-voice-ops.h). Defined in engine-tables.cpp and instantiated there for both voice types.
     template <typename V> void processTableTick(V& voice, int numFrames, float sampleRate);
 
     // The row half of the above, for ONE column's playhead: lane 0 also carries transpose and

@@ -208,7 +208,13 @@ set(ENGINE_CORE_SOURCES
         # it. Pure file-format handling over a FILE* — no tsf, no engine. See the header.
         soundfont-trim.cpp
         sample-editor.cpp
+        # One class, AudioEngine, over five files: the core, the sample pool, the SoundFont bank, the
+        # table walk, and the block itself (engine-mix.cpp — processAudioBlock).
         audio-engine.cpp
+        engine-samples.cpp
+        engine-soundfont.cpp
+        engine-tables.cpp
+        engine-mix.cpp
         transient-detector.cpp
         # Native compressed-audio decoders. dr_mp3/dr_flac impl live inside audio-decoders.cpp;
         # stb_vorbis and minimp4 each ship as a .c that must be its own translation unit (compiled as

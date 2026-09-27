@@ -1860,7 +1860,7 @@ class Sequencer {
         float instrVolWithVxx = params.volume;
 
         // ⚠️⚠️ **A ROW THAT HOPS IS NEVER HEARD** — the rule a TABLE's steering row has always
-        // followed (`processTableRow`, audio-engine.cpp), now the phrase's too. The jump is the row's
+        // followed (`processTableRow`, engine-tables.cpp), now the phrase's too. The jump is the row's
         // WHOLE content: no note, no effects, and **no time**, so a HOP costs a row but not a step and
         // a four-row loop lasts four rows. A note typed beside a HOP does not sound — put it on the
         // row above, which costs a row and nothing else.

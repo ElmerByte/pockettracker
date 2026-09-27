@@ -104,7 +104,7 @@ enum EventType : uint8_t {
     EV_PITCH_BEND     = 0xE0,  // MPB, absolute 14-bit (emitter: scheduler.h, MIDI phase D)
 };
 
-// Same-frame drain order (audio-engine.cpp:884/978, pinned as schema law): at equal frame the
+// Same-frame drain order (processAudioBlock, engine-mix.cpp — pinned as schema law): at equal frame the
 // engine applies param-class → NoteOff → NoteOn. Canonical trace sort key is (frame, track, rank).
 constexpr int sortRank(uint8_t type) {
     if (type == EV_NOTE_ON)  return 2;

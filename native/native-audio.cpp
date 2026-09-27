@@ -8,7 +8,7 @@
 //   soundfont-voice.h — SoundfontVoice struct (SF2 playback)
 //   soundfont-voice.cpp — TSF_IMPLEMENTATION + SoundfontVoice method bodies
 //   audio-engine.h    — AudioEngine class declaration
-//   audio-engine.cpp  — AudioEngine method bodies + sfVoices[8] definition
+//   audio-engine.cpp  — AudioEngine method bodies + sfVoices[] definition; engine-*.cpp the rest
 //
 // The engine is driven from `native/songcore/` (the host/consumer seam) and from the SDL shell; it has
 // no JNI surface of its own.

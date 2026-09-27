@@ -66,7 +66,12 @@ Everything a user sees is drawn by `pt-ui` into a software framebuffer.
 
 ```
 native/                            The portable program
-├── audio-engine.cpp / .h          The engine: processAudioBlock, voices, modulation, DSP
+├── audio-engine.cpp / .h          The engine: lifecycle, scheduling, modulation, meters, buses
+├── engine-mix.cpp                 processAudioBlock: the queue drain, the triggers, every voice's mix
+├── engine-tables.cpp              The table walk, the INS chain, the TABLE screen's row readout
+├── engine-samples.cpp             The sample pool: loading, clearing, the memory count
+├── engine-soundfont.cpp           The SoundFont bank: parsing a preset, the slot cache
+├── engine-voice-ops.h             Per-voice writes the table walk and the drain share
 ├── audio-decoders.cpp / .h        WAV, MP3, FLAC, OGG, Opus, M4A decoding
 ├── sampler-voice.h                Per-voice state for sample playback
 ├── soundfont-voice.cpp / .h       Per-voice state for SF2/SF3 (TinySoundFont — see the note below)
