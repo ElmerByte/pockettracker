@@ -497,7 +497,7 @@ public:
     // the audio show it directly. Returns false when the track has no sampler voice.
     bool getVoiceLoopWindow(int trackId, int* startFrame, int* endFrame);
 
-    // Schedule a table-row jump (THO on an empty step) for the active sampler voice at targetFrame.
+    // Schedule a table-row jump (THO on an empty step) for the track's voices at targetFrame.
     void scheduleVoiceTableRow(int64_t targetFrame, int trackId, int row);
 
     // Schedule a phraseVol update at exact frame (Vxx effect on empty steps)

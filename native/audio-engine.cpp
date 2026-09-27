@@ -2102,20 +2102,17 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     if (pv) pv->setVibratoRaw(upd.value, upd.value2);
                     break;
                 }
-                case PARAM_UPDATE_TABLE_ROW: {            // THO on empty step (sampler voices only)
-                    for (int v = 0; v < MAX_VOICES; v++) {
-                        if (voices[v].isActive && voices[v].trackId == upd.trackId) {
-                            // ⚠️ ALL THREE COLUMNS. This THO is written in a PHRASE, not in the
-                            // table, so it belongs to no column — "put this track's table on row X"
-                            // is the only thing it can mean. A THO inside the table steers the
-                            // column it is typed in; that one is in processTableRow.
-                            for (int l = 0; l < TABLE_LANES; ++l) {
-                                voices[v].lanes[l].row = (int)upd.value % 16;
-                                voices[v].lanes[l].lastProcessed = -1;  // re-apply the row immediately
-                            }
-                            break;
+                case PARAM_UPDATE_TABLE_ROW: {            // THO on empty step
+                    // ⚠️ ALL THREE COLUMNS. This THO is written in a PHRASE, not in the table, so it
+                    // belongs to no column — "put this track's table on row X" is the only thing it
+                    // can mean. A THO inside the table steers the column it is typed in; that one is
+                    // in processTableRow.
+                    forEachTrackVoice(upd.trackId, [&](auto& v) {
+                        for (int l = 0; l < TABLE_LANES; ++l) {
+                            v.lanes[l].row = (int)upd.value % 16;
+                            v.lanes[l].lastProcessed = -1;  // re-apply the row immediately
                         }
-                    }
+                    });
                     break;
                 }
                 // A per-voice controller. ⚠️ PAN reaches only the note the track is playing; every

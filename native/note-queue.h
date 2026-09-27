@@ -304,7 +304,7 @@ enum ParamUpdateAction {
     PARAM_UPDATE_MOD_SOURCE = 0,  // modSourceValues[sourceId] = value                   [Vxx]
     PARAM_UPDATE_PITCH_BEND,      // the track's note: setPitchBendRaw(value)            [PBN]
     PARAM_UPDATE_VIBRATO,         // the track's note: setVibratoRaw(value, value2)      [PVB/PVX]
-    PARAM_UPDATE_TABLE_ROW,       // sampler voice: every table column to row (int)value [THO]
+    PARAM_UPDATE_TABLE_ROW,       // the track's voices: every table column to row (int)value [THO]
     // A per-voice controller: `sourceId` is its CC id (songcore/event.h), `value` the 0-1 CC value.
     // PAN, REV, DEL, CUT, RES, LPF/HPF/BPF, DRV, CRU, FIN, LPO — one action, one apply function
     // (applyVoiceCc), shared with the table rows.
