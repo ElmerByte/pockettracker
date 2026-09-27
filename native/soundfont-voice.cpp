@@ -230,6 +230,9 @@ bool sf_memory_guard_tripped() { return g_sfMemoryGuardTripped; }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"   // vendored, not ours to fix
 #endif
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wnull-pointer-subtraction"
+#endif
 #include "vendor/tsf/tsf.h"
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop

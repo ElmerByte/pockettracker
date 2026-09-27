@@ -1474,7 +1474,6 @@ class Sequencer {
                                         int transposeSemitones, int64_t framesPerStep, int startRow,
                                         const Chain* chain = nullptr, int chainRow = 0) {
         const Project& project = *project_;
-        int scheduledNotes = 0;
         int rowsScheduled = 0;
         TrackState& trackState = trackStates_[clampi(trackId, 0, 7)];
         // Every random draw in the sequencer is reached from inside this call, so selecting the
@@ -1599,7 +1598,6 @@ class Sequencer {
             rowsScheduled++;
             frameOffset += stepDuration;
             if (currentGrooveActive) localGrooveStep++;
-            if (stepResult.noteScheduled) scheduledNotes++;
         }
 
         if (anyGrooveActive) trackState.grooveStep = localGrooveStep;

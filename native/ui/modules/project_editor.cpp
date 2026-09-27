@@ -11,7 +11,6 @@ namespace pt::ui {
 namespace {
 
 constexpr int NAME_X   = 10;                       // the label column
-constexpr int VALUE_X  = ProjectModule::VALUE_X;   // the value column
 constexpr int OPTION_W = 80;   // the stride between the buttons on a multi-button row
 
 int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }

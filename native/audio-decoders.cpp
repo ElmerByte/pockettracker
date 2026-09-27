@@ -4,11 +4,17 @@
 #include "platform_memory.h"  // available_memory_bytes — the decode's memory guard
 #include "load_progress.h"    // load_tick — a long decode reports itself, and can be cancelled
 
+#if defined(_MSC_VER)
+#pragma warning(push, 0)   // vendored, not ours to fix
+#endif
 #define DR_MP3_IMPLEMENTATION
 #include "vendor/dr_mp3/dr_mp3.h"
 
 #define DR_FLAC_IMPLEMENTATION
 #include "vendor/dr_flac/dr_flac.h"
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 // stb_vorbis is compiled as its own C translation unit (see CMakeLists.txt). Here we only need its
 // declarations — STB_VORBIS_HEADER_ONLY pulls in the public API without a second copy of the

@@ -15,7 +15,7 @@ namespace {
 // the reader depends on no packing pragma and no host byte order.
 
 constexpr int PHDR_SIZE = 38, PBAG_SIZE = 4, PMOD_SIZE = 10, PGEN_SIZE = 4;
-constexpr int INST_SIZE = 22, IBAG_SIZE = 4, IMOD_SIZE = 10, IGEN_SIZE = 4, SHDR_SIZE = 46;
+constexpr int INST_SIZE = 22, SHDR_SIZE = 46;
 
 // A generator is a (u16 operator, u16 amount) pair. These are the two whose amount is an INDEX into
 // another table, so they are the two that have to be renumbered when the tables shrink.

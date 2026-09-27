@@ -115,7 +115,7 @@ void AudioEngine::triggerSoundfontNote(const ScheduledNote& note, int frame, int
     }
     sv.chain.reset(sampleRate, /*keepToneState=*/wasSounding);
     sv.chain.filter.setParams(ip.filterType, ip.filterCut, ip.filterRes, ip.filterDrive,
-                              (int)sampleRate);
+                              sampleRate);
     sv.chain.filter.snapshotCoeffs(); // seed prev = target so first block doesn't interpolate from reset defaults
     sv.chain.drive.setDrive(ip.drive);
     sv.chain.crush.setParams(ip.crush, ip.downsample);
@@ -1236,7 +1236,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 int modRes = std::max(0, std::min(255,
                     (int)(sv.params.base[PARAM_FILTER_RES] + sv.modDestValues[PARAM_FILTER_RES])));
                 if (modCut != baseCut || modRes != baseRes) {
-                    sv.chain.filter.setParams(sv.chain.filter.type, modCut, modRes, sv.chain.filter.drive, (int)sampleRate);
+                    sv.chain.filter.setParams(sv.chain.filter.type, modCut, modRes, sv.chain.filter.drive, sampleRate);
                 }
             }
             // Drive and crush off the bus, as the sampler's mix does — except that the SF chain does

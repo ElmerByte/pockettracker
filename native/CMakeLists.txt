@@ -276,6 +276,25 @@ endif()
 # lib that tools/ptrender links — see the desktop branch above). cl.exe does not error on an unknown
 # `-f…`, it warns D9002 and IGNORES it, so an unguarded list would look fine and quietly do nothing.
 # Hence the explicit MSVC arm on each one.
+#
+# Warnings are on for OUR files on every compiler. The vendored sources compiled into this target
+# are silenced per file (their warnings are not ours to fix), and the vendored headers our TUs
+# include (tsf.h, stb_image.h, dr_mp3/dr_flac) are wrapped in a push/pop at the include.
+# PT_WERROR turns them into errors; CI sets it. ⚠️ Off by default on purpose: F-Droid builds the APK
+# itself, and a newer compiler's new warning must not fail a user's or a packager's build.
+option(PT_WERROR "Treat warnings in PocketTracker's own sources as errors" OFF)
+set(PT_VENDORED_ENGINE_SOURCES
+        effects/soundpipe/pareq.c
+        kissfft/kiss_fft.c
+        kissfft/kiss_fftr.c
+        effects/primitives/daisysp/svf.cpp
+        effects/primitives/daisysp/overdrive.cpp
+        effects/primitives/daisysp/decimator.cpp
+        effects/primitives/daisysp/limiter.cpp
+        effects/primitives/daisysp/compressor.cpp
+        effects/primitives/daisysp/crossfade.cpp
+        effects/primitives/daisysp/balance.cpp
+        effects/primitives/daisysp/reverbsc.cpp)
 if(MSVC)
     # M_PI is not in MSVC's <cmath> without this — the engine uses it in the LFOs, the SOLA window
     # and the FFT. (GCC/Clang expose it by default.) PUBLIC because sampler-voice.h uses M_PI in a
@@ -284,6 +303,17 @@ if(MSVC)
     # MSVC's default is already /fp:precise (no contraction, no reassociation) — state it anyway, so
     # a future /fp:fast in a parent scope cannot silently change the DSP's rounding.
     target_compile_options(pockettracker PRIVATE /fp:precise)
+
+    # /W4 is gcc's -Wall -Wextra -Wshadow plus the int→float conversions. The two CRT defines drop
+    # MSVC's "use fopen_s / _fileno instead" notices, which are advice about Microsoft's API, not bugs.
+    target_compile_options(pockettracker PRIVATE /W4 $<$<BOOL:${PT_WERROR}>:/WX>)
+    target_compile_definitions(pockettracker PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
+    set_source_files_properties(
+            ${PT_VENDORED_ENGINE_SOURCES}
+            vendor/stb_vorbis/stb_vorbis.c
+            vendor/minimp4/minimp4_impl.c
+            PROPERTIES COMPILE_OPTIONS "/W0"
+    )
 else()
     # -ffast-math here is a pure codegen optimisation (reassociation, no NaN/Inf special-casing)
     # for the DSP-heavy TUs. It is NOT the denormal protection: that is
@@ -329,25 +359,8 @@ else()
     # own /Od-Debug, /O2-Release defaults: no real-time constraint applies to a host tool.
     target_compile_options(pockettracker PRIVATE $<IF:$<CONFIG:Debug>,-O2,-O3>)
 
-    # Warnings on, for OUR files. The vendored sources compiled into this target are silenced per
-    # file below (their warnings are not ours to fix), and the two vendored headers our TUs include
-    # (tsf.h, stb_image.h) are wrapped in a diagnostic push/pop at the include. ⚠️ Not `-Werror`
-    # here: the count is zero on gcc, and clang and MSVC have not been through it yet.
-    target_compile_options(pockettracker PRIVATE -Wall -Wextra -Wshadow)
-    set_source_files_properties(
-            effects/soundpipe/pareq.c
-            kissfft/kiss_fft.c
-            kissfft/kiss_fftr.c
-            effects/primitives/daisysp/svf.cpp
-            effects/primitives/daisysp/overdrive.cpp
-            effects/primitives/daisysp/decimator.cpp
-            effects/primitives/daisysp/limiter.cpp
-            effects/primitives/daisysp/compressor.cpp
-            effects/primitives/daisysp/crossfade.cpp
-            effects/primitives/daisysp/balance.cpp
-            effects/primitives/daisysp/reverbsc.cpp
-            PROPERTIES COMPILE_OPTIONS "-w"
-    )
+    target_compile_options(pockettracker PRIVATE -Wall -Wextra -Wshadow $<$<BOOL:${PT_WERROR}>:-Werror>)
+    set_source_files_properties(${PT_VENDORED_ENGINE_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 endif()
 
 # freeverb3 is compiled for float samples, and names its own headers from the dragonfly/ root
@@ -359,9 +372,8 @@ file(GLOB PT_DRAGONFLY_SOURCES CONFIGURE_DEPENDS
 set_source_files_properties(${PT_DRAGONFLY_SOURCES} PROPERTIES
         COMPILE_DEFINITIONS LIBFV3_FLOAT
         INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/effects/primitives/dragonfly)
-if(NOT MSVC)
-    set_source_files_properties(${PT_DRAGONFLY_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")   # vendored
-endif()
+set_source_files_properties(${PT_DRAGONFLY_SOURCES} PROPERTIES COMPILE_OPTIONS
+        $<IF:$<BOOL:${MSVC}>,/W0,-w>)   # vendored
 
 # Include paths: root (for audio-defs.h, sampler-voice.h, etc.),
 #   effects/soundpipe (so pareq.c finds soundpipe.h), kissfft (for kiss_fft.h).
@@ -518,9 +530,11 @@ endif()
 # rounding than the tools that certify them.
 if(MSVC)
     target_compile_options(pt-ui PRIVATE /fp:precise)
+    target_compile_options(pt-ui PRIVATE /W4 $<$<BOOL:${PT_WERROR}>:/WX>)   # see the engine's note
+    target_compile_definitions(pt-ui PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
 else()
     target_compile_options(pt-ui PRIVATE -fno-fast-math -ffp-contract=off)
-    target_compile_options(pt-ui PRIVATE -Wall -Wextra -Wshadow)   # zero on gcc; see the engine's note
+    target_compile_options(pt-ui PRIVATE -Wall -Wextra -Wshadow $<$<BOOL:${PT_WERROR}>:-Werror>)
 endif()
 
 # ─── The Android SDL app: pt-ui's first real linker (convergence C3) ───────────────────────────

@@ -40,7 +40,7 @@ static inline void voiceSetFilter(V& v, int cut, int res, float sampleRate) {
     // LFO moves the centre the LFO swings around instead of fighting it for one block.
     int modCut = std::max(0, std::min(255, (int)(cut + v.modDestValues[PARAM_FILTER_CUT])));
     int modRes = std::max(0, std::min(255, (int)(res + v.modDestValues[PARAM_FILTER_RES])));
-    v.chain.filter.setParams(v.chain.filter.type, modCut, modRes, v.chain.filter.drive, (int)sampleRate);
+    v.chain.filter.setParams(v.chain.filter.type, modCut, modRes, v.chain.filter.drive, sampleRate);
 }
 // CUT and RES are one FilterModule call, so each carries the other's CURRENT value through. Read off
 // the bus, which both voice types seed from the instrument at trigger.
@@ -66,7 +66,7 @@ template <typename V> static inline void voiceSetFilterMode(V& v, int type, int 
     filterStore(v, cut, res);
     int modCut = std::max(0, std::min(255, (int)(cut + v.modDestValues[PARAM_FILTER_CUT])));
     int modRes = std::max(0, std::min(255, (int)(res + v.modDestValues[PARAM_FILTER_RES])));
-    v.chain.filter.setParams(type, modCut, modRes, v.chain.filter.drive, (int)sr);
+    v.chain.filter.setParams(type, modCut, modRes, v.chain.filter.drive, sr);
 }
 
 // LPO. ⚠️ **IT ADDS, WHERE EVERY OTHER SETTER ON THIS PAGE ASSIGNS** — the byte is a signed STEP in

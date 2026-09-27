@@ -1303,7 +1303,7 @@ class SongcoreHost {
         ev.type       = EV_NOTE_ON;
         ev.frame      = frame;
         ev.track      = AudioEngine::PREVIEW_LANE;
-        ev.instrument = instrumentId;
+        ev.instrument = static_cast<int16_t>(instrumentId);
 
         NoteOnPayload& n = ev.noteOn;
         n.note        = static_cast<uint8_t>(note_to_midi(note));

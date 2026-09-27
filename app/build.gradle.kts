@@ -63,6 +63,9 @@ android {
                     "-DANDROID_STL=c++_shared",
                     "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
                 )
+                // CI passes `-PptWerror` so a new warning in our sources fails the build there.
+                // Never on by default: F-Droid runs this same build with its own NDK.
+                if (project.hasProperty("ptWerror")) arguments += "-DPT_WERROR=ON"
             }
         }
     }

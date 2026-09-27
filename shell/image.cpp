@@ -18,10 +18,14 @@
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"   // vendored, not ours to fix
+#elif defined(_MSC_VER)
+#pragma warning(push, 0)
 #endif
 #include "vendor/stb_image/stb_image.h"
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
 #endif
 
 namespace ptshell {

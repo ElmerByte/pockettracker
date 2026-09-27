@@ -316,8 +316,9 @@ SettingsInputResult SettingsModule::handle_input(SettingsValues& v, Theme& theme
             break;
 
         // Out of range falls back to AUTO - index 0, the same shape LAYOUT and OVERLAY use.
-        case SettingsRow::ABXY:      if (set) v.abxyIndex = (action.value >= 0 && action.value < 3)
-                                                                ? action.value : 0; break;
+        case SettingsRow::ABXY:
+            if (set) v.abxyIndex = (action.value >= 0 && action.value < 3) ? action.value : 0;
+            break;
         case SettingsRow::KB_INSERT: if (set) v.insertBefore       = action.value > 0; break;
         case SettingsRow::CURSOR:    if (set) v.cursorRemember     = action.value > 0; break;
         case SettingsRow::NOTE_PREV: if (set) v.notePreviewEnabled = action.value > 0; break;

@@ -491,7 +491,7 @@ static const float* spectrum_hann_window() {
     static float w[SPECTRUM_FFT_SIZE];
     static const bool built = [] {
         for (int i = 0; i < SPECTRUM_FFT_SIZE; i++)
-            w[i] = 0.5f * (1.0f - cosf(2.0f * M_PI * i / (SPECTRUM_FFT_SIZE - 1)));
+            w[i] = 0.5f * (1.0f - cosf(static_cast<float>(2.0f * M_PI * i / (SPECTRUM_FFT_SIZE - 1))));
         return true;
     }();
     (void)built;

@@ -46,7 +46,7 @@ jobs:
           restore-keys: gradle-
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug -PptWerror --no-daemon   # a warning in OUR sources fails the build
 
       # ─── SDL2 must be IN the APK, not merely in the build (convergence plan C1) ────────────────
       #
@@ -290,7 +290,7 @@ jobs:
       - name: Build release APK and assert the JNI keep rules survived R8
         run: |
           set -u
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease -PptWerror --no-daemon
           FAIL=0
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           echo "apk: $APK"
@@ -373,7 +373,7 @@ jobs:
       # keep up with a real-time audio callback, and the usual "default it if empty" guard does not
       # fire on MSVC.
       - name: Configure
-        run: cmake -S shell -B shell/build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S shell -B shell/build -DCMAKE_BUILD_TYPE=Release -DPT_WERROR=ON
 
       - name: Build
         run: cmake --build shell/build --config Release

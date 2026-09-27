@@ -668,12 +668,10 @@ inline bool modal_backdrop_active(const AppState& s) {
 /**
  * Does a FULL-SCREEN module have the frame — i.e. is none of the furniture drawn this frame?
  *
- * ⚠️ Written once because THREE questions read it, and they are in two different files: `draw`'s
- * early return and `has_falling_meters` (layout.cpp), and whether a SELECT tap can raise the compact
- * help panel (input_dispatcher.cpp) — the panel lives in the oscilloscope strip, and on these screens
- * there is no strip. Two copies of this list would be one full-screen module away from disagreeing,
- * and the ways that shows up are all silent: a redraw loop pinned at 60 Hz over a static frame, or a
- * help gesture that toggles a flag nothing draws.
+ * ⚠️ Written once because two questions read it: `draw`'s early return and `has_falling_meters`
+ * (layout.cpp). Two copies would be one full-screen module away from disagreeing, and that shows up
+ * silently — a redraw loop pinned at 60 Hz over a static frame. (SELECT's compact help panel does NOT
+ * use it: the sample editor has no strip but shows the panel over its waveform — see `on_select`.)
  *
  * ⚠️ `!s.eq.isOpen` — the EQ editor opened from the sample editor REPLACES it and brings the normal
  * furniture back, strip included.
