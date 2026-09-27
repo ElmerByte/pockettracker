@@ -428,6 +428,14 @@ add_library(pt-ui STATIC
         ui/canvas.cpp
         ui/clipboard.cpp
         ui/input_dispatcher.cpp
+        ui/dispatch/browser.cpp
+        ui/dispatch/buttons.cpp
+        ui/dispatch/chords.cpp
+        ui/dispatch/midi.cpp
+        ui/dispatch/project.cpp
+        ui/dispatch/sample_editor.cpp
+        ui/dispatch/sub_screens.cpp
+        ui/dispatch/theme_scale_groove.cpp
         ui/layout.cpp
         ui/lifecycle.cpp
         ui/std_filesystem.cpp

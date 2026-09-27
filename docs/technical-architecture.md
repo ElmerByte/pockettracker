@@ -115,7 +115,9 @@ native/                            The portable program
     ├── platform_caps.h              Which features this build has (a VALUE, not an #ifdef)
     ├── screen.h / navigation.h      Screens and the R+DPAD navigation grid
     ├── cursor.h / cursor_move.h     CursorContext: what is under the cursor, and how it steps
-    ├── input_dispatcher.cpp / .h    Every button and combo, one place
+    ├── input_dispatcher.cpp / .h    Every button and combo: one class, its spine here
+    ├── dispatch/                    …and its per-screen halves (chords, buttons, browser,
+    │                                sample editor, project, midi, sub-screens, theme/scale/groove)
     ├── selection.h / clipboard.*    Multi-cell selection and copy/paste
     ├── layout.cpp / .h              Screen composition, top strip, right bar
     ├── theme.h / theme_io.h         Palettes and the theme file
@@ -659,7 +661,7 @@ that says so.
 
 ## Input Layer
 
-`ui/input_dispatcher.cpp` is every button and combo in one place.
+`ui/input_dispatcher.*` and `ui/dispatch/` are every button and combo — one class, split by screen.
 
 **Modifiers are snapshotted at EVENT time, not at poll time.** SDL delivers a whole frame's events at
 once, so asking "is A held?" while processing a B press describes the *end* of the frame. Roll B and

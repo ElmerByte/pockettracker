@@ -540,7 +540,7 @@ class InputDispatcher {
      * Open a load. `detail` is what the strip names — a file's display name, or a project's.
      *
      * ⚠️ Every `begin_load` needs its `end_load`, and every load path in the app is wrapped by
-     * `LoadScope` (input_dispatcher.cpp) rather than calling these by hand.
+     * `LoadScope` (ui/dispatch/dispatch_common.h) rather than calling these by hand.
      */
     void begin_load(long long now_ms, std::string detail);
 

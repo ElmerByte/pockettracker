@@ -17,8 +17,8 @@
 //
 // ⚠️ The caller is captured AT OPEN TIME and never re-read. That is deliberate and it is what makes
 // the editor safe to leave open: the pool cursor moving underneath it must not silently re-point the
-// bands at a different instrument. (Android lets that cursor move — see the B+UP note in
-// input_dispatcher.cpp — which is the bug this session found.)
+// bands at a different instrument. (Android lets that cursor move — see the note above
+// `InputDispatcher::on_b_up` — which is the bug this session found.)
 //
 // ── Its geometry is its own ──────────────────────────────────────────────────────────────────────
 //

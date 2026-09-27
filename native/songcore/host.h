@@ -287,8 +287,8 @@ class SongcoreHost {
      * `currentProject_` null and restores its own master EQ in RenderController.
      *
      * `play_song`/`play_chain`/`play_phrase` deliberately do NOT call this. Kotlin's play* verbs each
-     * open with `stop()`, but on both platforms the caller has already done it — the shell's `on_start`
-     * stops before it starts (input_dispatcher.cpp), and the JNI's caller is that same
+     * open with `stop()`, but on both platforms the caller has already done it — the dispatcher's
+     * `on_start` stops before it starts, and the JNI's caller is that same
      * `PlaybackController.play*`. A second stop here would buy nothing and would put an extra `t_stop`
      * into the event trace the 36 goldens byte-compare.
      */
