@@ -136,6 +136,8 @@ void InputDispatcher::set_now(long long now_ms) {
     // The cable reporting which channel its knobs are on — one copy a frame, for a screen that is
     // built in two places and can ask no host of its own.
     s_.midiInCcChannel = host_.last_cc_channel();
+    const AudioEngine::BlockTiming bt = host_.block_timing();
+    s_.audioLoad = AudioLoad{bt.blockFrames, bt.sampleRate, bt.meanLoad, bt.worstLoad};
 }
 
 // ─── A slow load ─────────────────────────────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@
 #include "ui/modules/qwerty_keyboard.h"
 #include "ui/modules/render_dialog.h"
 #include "ui/modules/sample_editor.h"
+#include "ui/modules/midi_settings.h"   // AudioLoad
 #include "ui/modules/theme_editor.h"
 #include "ui/modules/settings_editor.h"
 #include "ui/platform_caps.h"
@@ -405,6 +406,9 @@ struct AppState {
      * lazily by one of them is stale the moment the other one reads it.
      */
     int midiInCcChannel = -1;
+
+    /** The audio callback's cost, copied off the host in `set_now` like the channel above. */
+    AudioLoad audioLoad{};
 
     // ── The QWERTY keyboard ─────────────────────────────────────────────────────────────────────
     // The app's first true modal: while it is open it owns every button, and `isOpen` is checked

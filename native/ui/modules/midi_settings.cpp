@@ -138,6 +138,19 @@ int map_channel_at(const songcore::Project& p, int column) {
     return p.midiInputChannels[static_cast<size_t>(track)];
 }
 
+/**
+ * "BUF 10.7MS  CPU 8% MAX 27%". ⚠️ 29 glyphs is all the panel holds from the label column, and
+ * "BUF 92.9MS  CPU 999% MAX 999%" is exactly 29 — hence the clamp at 999 and no space before MS.
+ */
+std::string audio_load_text(const AudioLoad& a) {
+    if (a.blockFrames <= 0 || a.sampleRate <= 0) return "BUF --  CPU --";
+    const int tenthsMs = (a.blockFrames * 10000 + a.sampleRate / 2) / a.sampleRate;
+    const std::string buf = tenthsMs >= 1000 ? std::to_string(tenthsMs / 10)
+                                             : std::to_string(tenthsMs / 10) + "." + std::to_string(tenthsMs % 10);
+    const auto pct = [](int load) { return std::to_string(std::min((load + 5) / 10, 999)) + "%"; };
+    return "BUF " + buf + "MS  CPU " + pct(a.meanLoad) + " MAX " + pct(a.worstLoad);
+}
+
 }  // namespace
 
 // ─── Draw ────────────────────────────────────────────────────────────────────────────────────────
@@ -270,6 +283,14 @@ void MidiModule::draw(Canvas& c, int x, int y, const MidiState& s) const {
         const int statusY = firstRowY + midi_row_offset_y(MidiRow::TEST, ROW_HEIGHT) + ROW_HEIGHT * 2;
         c.draw_text(s.statusText, labelX, statusY + TEXT_PADDING, t.textTitle, CHAR_SPACING,
                     FONT_SCALE);
+    }
+
+    // The debug build's audio line: how long one device buffer is, and how much of that time the
+    // callback spent working — on average and at worst — over the last second. At 100 % the device runs dry.
+    if (s.caps.debug) {
+        const int lineY = firstRowY + midi_row_offset_y(MidiRow::TEST, ROW_HEIGHT) + ROW_HEIGHT * 3;
+        c.draw_text(audio_load_text(s.audioLoad), labelX, lineY + TEXT_PADDING, t.textParam,
+                    CHAR_SPACING, FONT_SCALE);
     }
 }
 

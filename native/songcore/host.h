@@ -590,6 +590,11 @@ class SongcoreHost {
      */
     int last_cc_channel() const { return lastCcChannel_; }
 
+    /** What the live audio callback costs over the last second; all zero without an engine. */
+    AudioEngine::BlockTiming block_timing() const {
+        return engine_ ? engine_->getBlockTiming() : AudioEngine::BlockTiming{};
+    }
+
     /**
      * A knob the song has a mapping for moved. Writes the value into the project and makes it heard.
      * Returns how many mappings that controller drove — 0 means nothing is mapped to it.

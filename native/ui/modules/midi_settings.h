@@ -39,6 +39,17 @@
 
 namespace pt::ui {
 
+/**
+ * The audio callback's cost over the last second, for the debug build's BUF/CPU line. Loads are in
+ * tenths of a percent of the block's own duration; all zero until the device has played a second.
+ */
+struct AudioLoad {
+    int blockFrames = 0;
+    int sampleRate  = 0;
+    int meanLoad    = 0;
+    int worstLoad   = 0;
+};
+
 struct MidiState {
     /** PROG CHG lives on the project — it is what the SONG means, so it travels in the .ptp. */
     const songcore::Project& project;
@@ -91,6 +102,9 @@ struct MidiState {
      * a channel number the user is not expected to know, and this is the controller telling them.
      */
     int lastCcChannel = -1;
+
+    /** Drawn on a debug build only — it is a diagnostic, not a setting. */
+    AudioLoad audioLoad{};
 
     PlatformCaps caps{};
     Theme        theme = theme_classic();

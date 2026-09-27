@@ -3003,6 +3003,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
 }
 
 void AudioEngine::processLiveBlock(float* output, int numFrames, int channelCount, float sampleRate) {
+    const auto blockStart = std::chrono::steady_clock::now();
 
     setFlushToZeroForCurrentThread();
 
@@ -3095,6 +3096,40 @@ void AudioEngine::processLiveBlock(float* output, int numFrames, int channelCoun
             sendPeakDelR = fmaxf(sendPeakDelR, frameSendPeakDelR);
         }
     }
+
+    recordBlockTiming(blockStart, numFrames, sampleRate);
+}
+
+void AudioEngine::recordBlockTiming(std::chrono::steady_clock::time_point start, int numFrames,
+                                    float sampleRate) {
+    if (numFrames <= 0 || sampleRate <= 0.0f) return;
+    const int64_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           std::chrono::steady_clock::now() - start).count();
+    // A load is busy time over sound time, in tenths of a percent.
+    const auto load = [sampleRate](int64_t busyNs, int64_t frames) {
+        return (int)std::min<double>(busyNs * (double)sampleRate / (frames * 1e6), 1e6);
+    };
+    timingBusyNs += ns;
+    timingFrames += numFrames;
+    timingWorst   = std::max(timingWorst, load(ns, numFrames));
+    if (timingFrames < (int64_t)sampleRate) return;
+
+    timingPubFrames.store(numFrames, std::memory_order_relaxed);
+    timingPubRate.store((int)sampleRate, std::memory_order_relaxed);
+    timingPubMean.store(load(timingBusyNs, timingFrames), std::memory_order_relaxed);
+    timingPubWorst.store(timingWorst, std::memory_order_relaxed);
+    timingBusyNs = 0;
+    timingFrames = 0;
+    timingWorst  = 0;
+}
+
+AudioEngine::BlockTiming AudioEngine::getBlockTiming() const {
+    BlockTiming t;
+    t.blockFrames = timingPubFrames.load(std::memory_order_relaxed);
+    t.sampleRate  = timingPubRate.load(std::memory_order_relaxed);
+    t.meanLoad    = timingPubMean.load(std::memory_order_relaxed);
+    t.worstLoad   = timingPubWorst.load(std::memory_order_relaxed);
+    return t;
 }
 
 int64_t AudioEngine::getCurrentFrame() {

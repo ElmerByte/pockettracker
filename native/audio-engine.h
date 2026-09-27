@@ -407,6 +407,13 @@ public:
     // oscilloscope/spectrum/peak data. Backend-agnostic — no DSP lives in the callback shell.
     void processLiveBlock(float* output, int numFrames, int channelCount, float sampleRate);
 
+    // What the live callback costs, over the last second of audio. A load is the time processLiveBlock
+    // took over the time its block of sound lasts, in tenths of a percent: 1000 means the callback
+    // needed as long as the sound it made, and the device is about to run dry. All zero until the
+    // device has played a second. Any thread; the four fields may come from adjacent seconds.
+    struct BlockTiming { int blockFrames = 0; int sampleRate = 0; int meanLoad = 0; int worstLoad = 0; };
+    BlockTiming getBlockTiming() const;
+
     // Get current global frame counter (for scheduling notes from Kotlin)
     int64_t getCurrentFrame();
 
@@ -1260,6 +1267,13 @@ private:
     // fine — a torn read would just be different entropy.
     uint32_t noteSeedEntropy = 0x9E3779B9u;
     std::atomic<bool> isOfflineRendering{false};  // True during WAV export → processLiveBlock outputs silence
+
+    // getBlockTiming's second: summed on the audio thread, published once it holds a second of audio.
+    void recordBlockTiming(std::chrono::steady_clock::time_point start, int numFrames, float sampleRate);
+    int64_t timingBusyNs = 0;    // audio thread only
+    int64_t timingFrames = 0;    // audio thread only
+    int     timingWorst  = 0;    // audio thread only
+    std::atomic<int> timingPubFrames{0}, timingPubRate{0}, timingPubMean{0}, timingPubWorst{0};
     std::atomic<int> currentTempo{120};  // Song BPM; read by the table-advance to derive framesPerTic
     std::atomic<LiveInputSource*> liveInput{nullptr};   // see setLiveInput
 

@@ -386,6 +386,7 @@ void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
                 ms.deviceIndex   = s.midiDeviceIndex;
                 ms.inDeviceIndex = s.midiInDeviceIndex;
                 ms.autoOffsetMs  = s.midiAutoOffsetMs;
+                ms.audioLoad     = s.audioLoad;
                 ms.statusText    = s.midiStatusText;
                 ms.caps          = s.caps;
                 ms.theme         = t;
