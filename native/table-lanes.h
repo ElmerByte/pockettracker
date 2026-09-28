@@ -17,8 +17,7 @@ struct TableLane {
     int   row           =  0;   // the row this lane is standing on (0-15)
     int   lastProcessed = -1;   // the last row whose effects were applied; -1 = none yet
     int   ticRate       =  6;   // 01-FB musical tics per row; 00 trigger, FC octave, FE note, FF 200 Hz
-    float frameAccum    =  0.0f;   // progress through the current row, standard rates
-    float tic200Accum   =  0.0f;   // …and at TICFF
+    double frameAccum   =  0.0;    // frames into the row in force; negative until the note's onset
     int   hopRepeat     =  0;   // jumps left on an active `HOP XY` (X > 0)
     int   hopTarget     = -1;   // its target row; -1 = no HOP counting
 

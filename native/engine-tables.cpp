@@ -206,18 +206,33 @@ void AudioEngine::effectiveTicRatesFor(int tableId, int fallback, int out[TABLE_
 //   TIC00 (0x00): Trigger mode — table row set by note, doesn't advance automatically
 //   TICFC (0xFC): Octave map — row = triggered note's octave (0-9)
 //   TICFE (0xFE): Note map — row = triggered note's pitch (0-11)
-//   TICFF (0xFF): 200Hz mode — advance ~1 row per 5ms
+//   TICFF (0xFF): 200Hz mode — one row every sampleRate / 200 frames
+
+// Frames one row lasts on a lane that advances by itself; 0 for the three modes that hold the row.
+// framesPerTic = sr / (BPM/60 · 4 steps/beat · 12 tics/step), so table speed tracks the sequencer.
+static double framesPerTableRow(int ticRate, int tempo, float sampleRate) {
+    if (ticRate == 0x00 || ticRate == 0xFC || ticRate == 0xFE) return 0.0;
+    if (ticRate == 0xFF) return sampleRate / 200.0;
+    return sampleRate / (tempo / 60.0 * 4.0 * 12.0) * ticRate;
+}
+
+// A lane's clock landing a hair under its row length after `ceil` is the same frame, not one more.
+static constexpr double TIC_EPSILON = 1e-6;
+
 template <typename V>
-void AudioEngine::processTableTick(V& voice, int numFrames, float sampleRate) {
+int AudioEngine::processTableTick(V& voice, int from, int maxFrames, float sampleRate) {
     // ⚠️ THE WHOLE TABLE, not just the current row, because the AUS/AUF pairing below is re-derived
-    // from every row on every block — that is what lets a backwards HOP resume a ramp mid-span with
+    // from every row on every call — that is what lets a backwards HOP resume a ramp mid-span with
     // nothing stored per voice.
     TableRow rows[16];
-    if (!tables.read(voice.tableId, rows)) return;
+    if (!tables.read(voice.tableId, rows)) return maxFrames;
+    const int tempo = currentTempo.load(std::memory_order_relaxed);
 
-    // How far each lane is through the row it is standing on, for the ramp's sub-row interpolation.
-    // 0 in the three non-advancing TIC modes, which hold the row still by design.
-    double rowFraction[TABLE_LANES] = {0.0, 0.0, 0.0};
+    // ⚠️ **A BLANK TABLE IS NEVER CUT.** Every note runs its instrument's table, written or not, and a
+    // blank row changes nothing — cutting the voice there would only re-derive it for the same values.
+    bool blank = true;
+    for (const TableRow& r : rows)
+        blank = blank && r.transpose == 0 && r.volume == 0xFF && !r.fx1Type && !r.fx2Type && !r.fx3Type;
 
     // ⚠️ **THE RATE MACHINE RUNS ONCE PER LANE, AND NOTHING IN IT IS SHARED.** A lane at TICFF next
     // to a lane at TIC 06 is the point of the feature; a single accumulator would make the faster
@@ -228,52 +243,22 @@ void AudioEngine::processTableTick(V& voice, int numFrames, float sampleRate) {
 
         bool shouldProcessRow = false;
         bool shouldAdvance = false;
+        const double perRow = framesPerTableRow(L.ticRate, tempo, sampleRate);
 
-        if (L.ticRate == 0x00) {
-            // TIC00: Trigger mode - apply row effects ONCE, don't advance automatically
+        if (perRow <= 0.0) {
+            // TIC00 / TICFC / TICFE: the row is placed by the note and applied once.
             shouldProcessRow = (L.row != L.lastProcessed);
-            shouldAdvance = false;
-        } else if (L.ticRate == 0xFC || L.ticRate == 0xFE) {
-            // TICFC/TICFE: Static mapping modes - row is fixed, process ONCE
-            shouldProcessRow = (L.row != L.lastProcessed);
-            shouldAdvance = false;
-        } else if (L.ticRate == 0xFF) {
-            // TICFF: 200Hz mode - faster advancement
-            L.tic200Accum += numFrames;
-            float samplesPerTic = sampleRate / 200.0f;
-            if (L.tic200Accum >= samplesPerTic) {
-                L.tic200Accum -= samplesPerTic;
-                shouldProcessRow = true;
-                shouldAdvance = true;
-            }
-            if (samplesPerTic > 0.0f) rowFraction[lane] = L.tic200Accum / samplesPerTic;
-        } else {
-            // Standard tic mode (01-FB): advance one row every `ticRate` musical tics.
-            // Frame-accurate and tempo-locked (like the TICFF branch above) so table speed tracks
-            // the sequencer, is identical live vs. offline render, and is independent of the audio
-            // buffer size. framesPerTic = sr / (BPM/60 · 4 steps/beat · 12 tics/step).
-            if (L.lastProcessed == -1) {
-                // Fire the first tic AT trigger so row 0's transpose/vol/FX apply immediately.
-                // Otherwise the voice plays one full row-duration with no table effect, which sounds
-                // like the first row lasts twice as long. Mirrors TIC00's note-on processing.
-                L.frameAccum = 0.0f;
-                shouldProcessRow = true;
-                shouldAdvance = true;
-            } else {
-                int tempo = currentTempo.load(std::memory_order_relaxed);
-                float framesPerRow = sampleRate / (tempo / 60.0f * 4.0f * 12.0f) * (float)L.ticRate;
-                L.frameAccum += numFrames;
-                if (framesPerRow > 0.0f && L.frameAccum >= framesPerRow) {
-                    L.frameAccum -= framesPerRow;
-                    // A block longer than one row (very fast tables) can't advance >1 row here, so
-                    // drop the extra rather than banking it (which would run away). Normal tic rates
-                    // have framesPerRow >> block, so the remainder carries and the rate stays exact.
-                    if (L.frameAccum >= framesPerRow) L.frameAccum = 0.0f;
-                    shouldProcessRow = true;
-                    shouldAdvance = true;
-                }
-                if (framesPerRow > 0.0f) rowFraction[lane] = L.frameAccum / framesPerRow;
-            }
+        } else if (L.lastProcessed == -1) {
+            // The first row plays AT the note, so row 0's transpose/vol/FX apply from its first
+            // sample. The clock starts at the note's onset, which may lie later in this block.
+            L.frameAccum = (voice.startDelayFrames > from) ? -(double)(voice.startDelayFrames - from) : 0.0;
+            shouldProcessRow = shouldAdvance = true;
+        } else if (L.frameAccum >= perRow - TIC_EPSILON) {
+            L.frameAccum -= perRow;
+            // Only reachable when the row got shorter under the clock (tempo, a TIC row) or on the
+            // block-rate path: drop the backlog rather than bank it, or rows would run away.
+            if (L.frameAccum >= perRow) L.frameAccum = 0.0;
+            shouldProcessRow = shouldAdvance = true;
         }
 
         // ⚠️ A HOP or THO does not consume the tic — it moves the lane and the row it lands on plays
@@ -281,10 +266,35 @@ void AudioEngine::processTableTick(V& voice, int numFrames, float sampleRate) {
         // ring of them, cannot spin the audio thread; a ring with no playable row simply sounds
         // nothing, which is what a table of pure jumps deserves.
         for (int steered = 0; shouldProcessRow && steered <= 16; ++steered)
-            if (!processTableRow(voice, rows[L.row], lane, shouldAdvance, sampleRate)) break;
-        // ⚠️ A HOP FF in an EARLIER lane can have cleared tableId this same block. Stop reading the
-        // table copy the moment it does — the remaining lanes are already down.
-        if (voice.tableId < 0) break;
+            if (!processTableRow(voice, rows[L.row], lane, shouldAdvance, from, sampleRate)) break;
+        // ⚠️ A HOP FF in an EARLIER lane can have cleared tableId. Stop reading the table copy the
+        // moment it does — the remaining lanes are already down.
+        if (voice.tableId < 0) return maxFrames;
+    }
+
+    // ⚠️ **THE SEGMENT ENDS WHERE THE NEXT ROW OF ANY LANE BEGINS**, so the caller renders up to it and
+    // calls again: a row starts on its own frame, not on a block edge. Measured in whole frames — the
+    // fraction carries in the lane's clock, so the rate is exact over time.
+    int frames = maxFrames;
+    if (!blank) {
+        for (int lane = 0; lane < TABLE_LANES; ++lane) {
+            const TableLane& L = voice.lanes[lane];
+            const double perRow = framesPerTableRow(L.ticRate, tempo, sampleRate);
+            if (!L.active || perRow <= 0.0) continue;
+            const double left = std::ceil(perRow - L.frameAccum - TIC_EPSILON);
+            frames = std::min(frames, left < 1.0 ? 1 : (left < (double)maxFrames ? (int)left : maxFrames));
+        }
+    }
+
+    // How far each lane is through the row in force, at the END of this segment — the ramp's target,
+    // which the mix interpolates towards across it. 0 in the three modes that hold the row still.
+    double rowFraction[TABLE_LANES] = {0.0, 0.0, 0.0};
+    for (int lane = 0; lane < TABLE_LANES; ++lane) {
+        TableLane& L = voice.lanes[lane];
+        const double perRow = framesPerTableRow(L.ticRate, tempo, sampleRate);
+        if (!L.active || perRow <= 0.0) continue;
+        L.frameAccum += frames;
+        rowFraction[lane] = std::max(0.0, std::min(1.0, L.frameAccum / perRow));
     }
 
     // ⚠️ THE RAMP IS EVALUATED AGAINST `lastProcessed`, NOT the lane's current row. The row whose
@@ -292,9 +302,8 @@ void AudioEngine::processTableTick(V& voice, int numFrames, float sampleRate) {
     // (or HOPped) to the one that comes NEXT, and reading it would run every fade a whole row ahead
     // of what is being heard. `frameAccum` is the progress through that same consumed row, so the
     // pair is consistent by construction.
-    //
-    // ⚠️ And AFTER the row work, so a table that just executed `HOP FF` in every lane runs no ramp.
-    if (voice.tableId >= 0) applyTableRamps(voice, rows, rowFraction, sampleRate);
+    applyTableRamps(voice, rows, rowFraction, sampleRate);
+    return frames;
 }
 
 // One lane consuming one row.
@@ -313,7 +322,7 @@ void AudioEngine::processTableTick(V& voice, int numFrames, float sampleRate) {
 // filter. The caller re-enters on `true` until a row actually plays.
 template <typename V>
 bool AudioEngine::processTableRow(V& voice, const TableRow& row, int lane, bool shouldAdvance,
-                                  float sampleRate) {
+                                  int atFrame, float sampleRate) {
     TableLane& L = voice.lanes[lane];
 
     const uint8_t laneFxType = (lane == 0) ? row.fx1Type : (lane == 1) ? row.fx2Type : row.fx3Type;
@@ -342,7 +351,7 @@ bool AudioEngine::processTableRow(V& voice, const TableRow& row, int lane, bool 
         switch (fxType) {
             case FX_KILL:
                 if (fxValue == 0x00) {
-                    tableKill(voice);
+                    tableKill(voice, atFrame);
                     LOGT("📋 Table effect: KILL track %d", voice.getTrackId());
                 }
                 break;
@@ -531,11 +540,11 @@ bool AudioEngine::processTableRow(V& voice, const TableRow& row, int lane, bool 
 // through, so a table morph and a phrase morph over the same two presets land on the same bytes.
 // What is here is only the apply: the five effects a table row can both carry and ramp.
 //
-// ⚠️ **EVERY BLOCK, NOT EVERY ROW** — that is the whole reason processTableTick was split. A ramp
+// ⚠️ **EVERY CALL, NOT EVERY ROW** — that is the whole reason processTableTick was split. A ramp
 // re-evaluated only on a row change would be sixteen values, the sub-row interpolation would be dead
 // code, and a slow morph would step audibly. The cost is one 48-slot walk plus, for an EQ ramp, six
-// `powf` per voice per block; at eight voices that is a fraction of a percent of a core, and it buys
-// a fade instead of a staircase.
+// `powf` per voice per call (a block, or less where a row begins inside it); at eight voices that is
+// a fraction of a percent of a core, and it buys a fade instead of a staircase.
 template <typename V>
 void AudioEngine::applyTableRamps(V& voice, const TableRow* rows,
                                   const double (&rowFraction)[TABLE_LANES], float sampleRate) {
@@ -782,5 +791,5 @@ int AudioEngine::getVoiceTableId(int trackId) {
 }
 
 // processAudioBlock (engine-mix.cpp) ticks both voice pools.
-template void AudioEngine::processTableTick<Voice>(Voice&, int, float);
-template void AudioEngine::processTableTick<SoundfontVoice>(SoundfontVoice&, int, float);
+template int AudioEngine::processTableTick<Voice>(Voice&, int, int, float);
+template int AudioEngine::processTableTick<SoundfontVoice>(SoundfontVoice&, int, int, float);

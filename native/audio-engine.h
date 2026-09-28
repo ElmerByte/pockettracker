@@ -732,7 +732,7 @@ public:
     void triggerSoundfontNote(const ScheduledNote& note, int frame, int64_t currentFrame, float sampleRate);
     void triggerSamplerNote(const ScheduledNote& note, int frame, int64_t currentFrame, float sampleRate);
 
-    // What mixTrackBuffer needs from the block it is called in — processAudioBlock's per-block values.
+    // What chainTrackPiece and mixTrackBuffer need from the block — processAudioBlock's per-block values.
     struct TrackBufferMix {
         float*       output;          // interleaved stereo, the block being summed into
         int          numFrames;
@@ -743,6 +743,8 @@ public:
         bool         octaWanted;      // the OCTA scopes are being drawn
         int          monitoredInstrId;
     };
+    template <typename V>
+    void chainTrackPiece(V& v, int t, float* buf, const TrackBufferMix& c, int from, int to);
     template <typename V>
     float mixTrackBuffer(V& v, int t, float* buf, const TrackBufferMix& c, bool& stopFadeDone);
 
@@ -775,7 +777,10 @@ public:
     // Duck-typed template over the identical table-state fields; the two per-type differences (KIL
     // semantics, OFFSET) resolve at compile time via the tableKill/tableOffset overloads
     // (engine-voice-ops.h). Defined in engine-tables.cpp and instantiated there for both voice types.
-    template <typename V> void processTableTick(V& voice, int numFrames, float sampleRate);
+    //
+    // Plays every row due at frame `from` of the block, then returns how many frames the caller may
+    // render before the next one is due (at most `maxFrames`) and moves the clocks by that much.
+    template <typename V> int processTableTick(V& voice, int from, int maxFrames, float sampleRate);
 
     // The row half of the above, for ONE column's playhead: lane 0 also carries transpose and
     // volume, and every lane carries its own FX slot. Applied on the blocks where that lane
@@ -785,7 +790,7 @@ public:
     // Returns true when the row only STEERED the lane (HOP / THO) and the lane has been moved to
     // the row that must play in this same tic — see the steering note at the definition.
     template <typename V> bool processTableRow(V& voice, const TableRow& row, int lane,
-                                               bool shouldAdvance, float sampleRate);
+                                               bool shouldAdvance, int atFrame, float sampleRate);
 
     // The AUS/AUF ramps a table declares, applied to one voice at the position it is standing on.
     // ⚠️ AFTER the row's own effects, never before: on the AUS row the ramp is at t=0, so it writes

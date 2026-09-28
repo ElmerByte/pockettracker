@@ -311,24 +311,43 @@ void AudioEngine::triggerSamplerNote(const ScheduledNote& note, int frame, int64
     }
 }
 
-// One track's rendered stereo buffer onto the bus, from after the note's own gain: the track fader,
-// the voice's chain, the mute gate and the transport-stop ramp, the send tap, the output, the meters
-// and scopes. The SoundFont path's tail — a voice type that renders a buffer per track calls it too,
-// rather than a copy that drifts. Returns the buffer's peak; `stopFadeDone` is set when the stop ramp
-// reached zero inside this block. (Audio thread only.)
+// One piece — frames [from, to) — of a track's rendered stereo buffer, from after the note's own gain:
+// the track fader, then the voice's chain. The fader ramps across the whole block, the chain's filter
+// across the piece. A voice type that renders a buffer per track calls this per piece and
+// mixTrackBuffer once per block. (Audio thread only.)
+template <typename V>
+void AudioEngine::chainTrackPiece(V& v, int t, float* buf, const TrackBufferMix& c, int from, int to) {
+    // ⚠️ THE TRACK FADER IS APPLIED TO THE RENDERED SAMPLES, NOT TO THE TSF CHANNEL. A channel
+    // volume is one value per render call, so the fader could only step at a render edge — the
+    // staircase a knob turns into a tick per message. Here it is a ramp, like the note's own
+    // gain before it. It stays ABOVE the chain, so an instrument's drive and filter hear the
+    // faded signal.
+    if (c.trackVolStart[t] != 1.0f || c.trackVolEnd[t] != 1.0f) {
+        for (int i = from; i < to; i++) {
+            const float g = c.trackVolStart[t] + (c.trackVolEnd[t] - c.trackVolStart[t])
+                                                 * (float)(i + 1) / (float)c.numFrames;
+            buf[i * 2]     *= g;
+            buf[i * 2 + 1] *= g;
+        }
+    }
+    const int frames = to - from;
+    for (int i = from; i < to; i++) {
+        float lerp_t = (frames > 1) ? (float)(i - from + 1) / (float)frames : 1.0f;
+        v.chain.filter.setInterpolatedCoeffs(lerp_t);
+        v.chain.processStereo(buf[i * 2], buf[i * 2 + 1]);
+    }
+}
+
+// One track's chained stereo buffer onto the bus: the mute gate and the transport-stop ramp, the send
+// tap, the output, the meters and scopes — once per block, after chainTrackPiece has covered it. The
+// SoundFont path's tail — a voice type that renders a buffer per track calls it too, rather than a
+// copy that drifts. Returns the buffer's peak; `stopFadeDone` is set when the stop ramp reached zero
+// inside this block. (Audio thread only.)
 template <typename V>
 float AudioEngine::mixTrackBuffer(V& v, int t, float* buf, const TrackBufferMix& c, bool& stopFadeDone) {
-    // ⚠️ THE TRACK FADER IS APPLIED TO THE RENDERED SAMPLES, NOT TO THE TSF CHANNEL. A channel
-    // volume is one value per render call, so the fader could only step at a block edge — the
-    // staircase a knob turns into a tick per message. Here it is a ramp, like the note's own
-    // gain before it. It stays ABOVE the chain, where the channel volume had it, so an
-    // instrument's drive and filter hear the same signal they always did.
-    if (c.trackVolStart[t] != 1.0f || c.trackVolEnd[t] != 1.0f)
-        applyGainRamp(buf, c.numFrames, c.trackVolStart[t], c.trackVolEnd[t]);
-
-    // ⚠️ THE MUTE GATE IS APPLIED HERE, and it has to be ABOVE the send tap below: the fader
-    // is already in the buffer, which makes a SoundFont send post-fader where the sampler's is
-    // pre-fader, and a muted SF track has always taken its reverb and delay down with it.
+    // ⚠️ THE MUTE GATE IS APPLIED HERE, and it has to be ABOVE the send tap below: the fader is
+    // already in the buffer (chainTrackPiece), which makes a SoundFont send post-fader where the
+    // sampler's is pre-fader, and a muted SF track has always taken its reverb and delay down with it.
     // ⚠️ THE TRANSPORT-STOP RAMP RIDES HERE, on the gate and for the gate's own reason: it has
     // to be per sample (a per-block value is the staircase both ramps exist to remove), it has
     // to sit BELOW the filter so a stop cannot slam the chain under a note still ringing
@@ -338,8 +357,6 @@ float AudioEngine::mixTrackBuffer(V& v, int t, float* buf, const TrackBufferMix&
         float lerp_t = (c.numFrames > 1) ? (float)(i + 1) / (float)c.numFrames : 1.0f;
         float L = buf[i * 2];
         float R = buf[i * 2 + 1];
-        v.chain.filter.setInterpolatedCoeffs(lerp_t);
-        v.chain.processStereo(L, R);
         float gate = c.gateStart[t] + (c.gateEnd[t] - c.gateStart[t]) * lerp_t;
         if (v.stopFadeRemaining > 0) {
             if (i >= v.stopFadeStartFrame) {   // a ramp dispatched mid-block waits for its frame
@@ -759,62 +776,14 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         }
     }
 
-    // Table machinery (tic advance + row FX processing) — ONE implementation for both
-    // voice types: processTableTick, engine-tables.cpp (KIL/OFFSET differences resolve via the
-    // tableKill/tableOffset overloads).
-    for (int v = 0; v < MAX_VOICES; v++) {
-        if (!voices[v].isActive || voices[v].tableId < 0) continue;
-        processTableTick(voices[v], numFrames, sampleRate);
-        // The ONE place the track's TIC00 cursor is written — below the row logic, so it cannot drift
-        // from it. Only the voice a retrigger would have read (live, not fading) owns the cursor;
-        // letting a fading voice write it would make the value depend on slot order.
-        //
-        // Written when ANY column is at TIC00, and it stores all three: the retrigger re-checks each
-        // column's own rate, exactly as it does when reading them off a live voice.
-        bool anyTic00 = false;
-        for (int l = 0; l < TABLE_LANES; ++l) anyTic00 |= (voices[v].lanes[l].ticRate == 0x00);
-        if (anyTic00 && !voices[v].isFadingOut) {
-            const int t = voices[v].trackId;
-            if (t >= 0 && t < SF_VOICE_COUNT) {
-                if (Tic00Cursor* c = tic00Slot(t, voices[v].tableId, /*create=*/true)) {
-                    for (int l = 0; l < TABLE_LANES; ++l) {
-                        c->row[l]           = voices[v].lanes[l].row;
-                        c->lastProcessed[l] = voices[v].lanes[l].lastProcessed;
-                        c->ticRate[l]       = voices[v].lanes[l].ticRate;
-                        c->active[l]        = voices[v].lanes[l].active;
-                    }
-                    tic00Sounding[t] = voices[v].tableId;   // what the TABLE screen draws
-                }
-            }
-        }
-    }
-    for (int t = 0; t < SF_VOICE_COUNT; t++) {
-        if (sfVoices[t].isActive && sfVoices[t].tableId >= 0)
-            processTableTick(sfVoices[t], numFrames, sampleRate);
-    }
+    // A sampler voice's modulation for the next `frames` of the block, then its pan and filter.
+    const auto prepareVoice = [&](Voice& voice, int frames) {
+        updateVoicePitchMod(voice, frames, sampleRate);
 
-    for (int v = 0; v < MAX_VOICES; v++) {
-        Voice& voice = voices[v];
-        if (!voice.isActive) continue;
-        updateVoicePitchMod(voice, numFrames, sampleRate);
-    }
-
-    // Snapshot envValues before advancing so the mix loop can interpolate
-    // per-sample (eliminates block-rate staircase artifacts on short envelopes).
-    for (int v = 0; v < MAX_VOICES; v++) {
-        if (!voices[v].isActive) continue;
-        for (int m = 0; m < 4; m++)
-            voices[v].voiceMods[m].prevEnvValue = voices[v].voiceMods[m].envValue;
-    }
-    for (int v = 0; v < MAX_VOICES; v++) {
-        if (!voices[v].isActive) continue;
-        updateVoiceModulation(voices[v], numFrames, sampleRate);
-    }
-
-    // Apply per-voice PAN and FILTER modulation (once per block)
-    for (int v = 0; v < MAX_VOICES; v++) {
-        Voice& voice = voices[v];
-        if (!voice.isActive) continue;
+        // Snapshot envValues before advancing so the mix loop can interpolate
+        // per-sample (eliminates block-rate staircase artifacts on short envelopes).
+        for (int m = 0; m < 4; m++) voice.voiceMods[m].prevEnvValue = voice.voiceMods[m].envValue;
+        updateVoiceModulation(voice, frames, sampleRate);
 
         // PAN modulation: snapshot before update so the mix loop can interpolate per-sample
         voice.prevPanLeft  = voice.panLeft;
@@ -850,20 +819,15 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             }
             if (hasVolMod && allDone) voice.isActive = false;
         }
-    }
+    };
 
-    // Mix voices — try_lock so applyRateAndBits can swap buffers safely.
-    // If the edit lock is held we skip one callback (~10ms silence) instead of crashing.
-    {
-    std::unique_lock<std::mutex> editLock(sampleEditMutex, std::try_to_lock);
-    if (editLock.owns_lock()) {
-    for (int v = 0; v < MAX_VOICES; v++) {
-        Voice& voice = voices[v];
-        if (!voice.isActive || !voice.sampleData) continue;
+    // One piece of one sampler voice — frames [from, to) of the block — into the output and sends.
+    const auto mixVoice = [&](Voice& voice, int from, int to) {
+        if (!voice.sampleData) return;
         // The slot's buffers changed since this voice was triggered: its pointer may be freed.
         if (voice.sampleGen != sampleGen[voice.instrId].load(std::memory_order_relaxed)) {
             voice.stop();
-            continue;
+            return;
         }
 
         int effDrive     = std::max(0, std::min(255, (int)(voice.params.base[PARAM_DRIVE]      + voice.modDestValues[PARAM_DRIVE])));
@@ -952,15 +916,20 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
 
         // Honour the intra-block trigger offset: a note dispatched at blockStart+f must not sound
         // before frame f. The fade has the same offset (fadeStartFrame, held in the loop below);
-        // params stay block-quantized — they are ramped across the block, and the ramp is the
-        // anti-click.
-        int startFrame = 0;
+        // params stay quantized to the piece — they are ramped across it, and the ramp is the
+        // anti-click. An onset beyond this piece waits for the piece that contains it.
+        int startFrame = from;
         if (voice.startDelayFrames > 0) {
-            startFrame = std::min(voice.startDelayFrames, numFrames);
+            if (voice.startDelayFrames >= to) return;
+            startFrame = std::max(from, voice.startDelayFrames);
             voice.startDelayFrames = 0;
         }
 
-        for (int i = startFrame; i < numFrames; i++) {
+        // ⚠️ TWO RAMPS, TWO CLOCKS. The voice's own params (pan, VOL routes, envelopes, filter) were
+        // derived for THIS piece and ramp across it; the mixer's fader and mute gate were derived
+        // for the whole block and must ramp across the block, or a cut piece would step them.
+        const int pieceFrames = to - from;
+        for (int i = startFrame; i < to; i++) {
             int idx = (int)voice.position;
             // frac computed in double THEN narrowed: (float)idx is inexact past 2^24, which
             // would corrupt frac for exactly the long samples double position exists for.
@@ -979,7 +948,8 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             }
 
             // STEP 4 scalars (shared by mono and stereo paths)
-            float t = (numFrames > 1) ? (float)(i + 1) / (float)numFrames : 1.0f;
+            float t = (pieceFrames > 1) ? (float)(i - from + 1) / (float)pieceFrames : 1.0f;
+            const float tBlock = (numFrames > 1) ? (float)(i + 1) / (float)numFrames : 1.0f;
             float panL = voice.prevPanLeft  + (voice.panLeft  - voice.prevPanLeft)  * t;
             float panR = voice.prevPanRight + (voice.panRight - voice.prevPanRight) * t;
             float finalVol = voice.volume;
@@ -1001,13 +971,14 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             // ⚠️ SF_VOICE_COUNT, not 8: the preview lane is index 8 and now carries a real fader.
             // Bounded at 8 the sampler path would hold unity while the SoundFont path (which indexes
             // the same array by trackId with no such clamp) followed it — two readings of one array.
-            // ⚠️ THE FADER AND THE MUTE GATE BOTH RIDE HERE, interpolated across the block on the same
-            // `t` as pan: together they are everything between a mixer move and a step in the output.
+            // ⚠️ THE FADER AND THE MUTE GATE BOTH RIDE HERE, interpolated across the whole block on
+            // `tBlock`, never the piece's `t`: together they are everything between a mixer move
+            // and a step in the output.
             float trackVol = (voice.trackId >= 0 && voice.trackId < SF_VOICE_COUNT)
                            ? (trackVolStart[voice.trackId]
-                              + (trackVolEnd[voice.trackId] - trackVolStart[voice.trackId]) * t)
+                              + (trackVolEnd[voice.trackId] - trackVolStart[voice.trackId]) * tBlock)
                              * (gateStart[voice.trackId]
-                                + (gateEnd[voice.trackId] - gateStart[voice.trackId]) * t)
+                                + (gateEnd[voice.trackId] - gateStart[voice.trackId]) * tBlock)
                            : 1.0f;
             float antiClick = voice.antiClickFade();
 
@@ -1170,172 +1141,233 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     }
                 }
             }
-        } // for (int i = 0; i < numFrames; i++)
-    } // for (int v = 0; v < MAX_VOICES; v++)
-    } // if (editLock.owns_lock())
-    } // sampleEditMutex try_lock scope
+        } // for (int i = startFrame; i < to; i++)
+    };
 
+    // ⚠️⚠️ **EACH SAMPLER VOICE RUNS TO THE END OF THE BLOCK BEFORE THE NEXT STARTS, IN PIECES CUT WHERE
+    // ITS TABLE PLAYS A ROW.** The voice renders up to the row's frame, the row is applied, the voice's
+    // modulation is derived again and it renders on — so a row starts on its own sample, not on a
+    // block edge. A voice with no row due this block is one piece, the whole block.
+    //
+    // The sample-edit lock is a try_lock so applyRateAndBits can swap buffers safely; while it is held
+    // the voices still advance and are not mixed — one block of silence instead of a crash.
+    {
+    std::unique_lock<std::mutex> editLock(sampleEditMutex, std::try_to_lock);
+    for (int v = 0; v < MAX_VOICES; v++) {
+        Voice& voice = voices[v];
+        for (int from = 0; from < numFrames && voice.isActive; ) {
+            int to = numFrames;
+            if (voice.tableId >= 0) {
+                to = from + processTableTick(voice, from, numFrames - from, sampleRate);
+                // The ONE place the track's TIC00 cursor is written — below the row logic, so it
+                // cannot drift from it. Only the voice a retrigger would have read (live, not fading)
+                // owns the cursor; letting a fading voice write it would make the value depend on
+                // slot order.
+                //
+                // Written when ANY column is at TIC00, and it stores all three: the retrigger
+                // re-checks each column's own rate, exactly as it does when reading them off a live
+                // voice.
+                bool anyTic00 = false;
+                for (int l = 0; l < TABLE_LANES; ++l) anyTic00 |= (voice.lanes[l].ticRate == 0x00);
+                if (anyTic00 && !voice.isFadingOut) {
+                    const int t = voice.trackId;
+                    if (t >= 0 && t < SF_VOICE_COUNT) {
+                        if (Tic00Cursor* c = tic00Slot(t, voice.tableId, /*create=*/true)) {
+                            for (int l = 0; l < TABLE_LANES; ++l) {
+                                c->row[l]           = voice.lanes[l].row;
+                                c->lastProcessed[l] = voice.lanes[l].lastProcessed;
+                                c->ticRate[l]       = voice.lanes[l].ticRate;
+                                c->active[l]        = voice.lanes[l].active;
+                            }
+                            tic00Sounding[t] = voice.tableId;   // what the TABLE screen draws
+                        }
+                    }
+                }
+            }
+            prepareVoice(voice, to - from);
+            if (editLock.owns_lock() && voice.isActive) mixVoice(voice, from, to);
+            from = to;
+        }
+    }
+    }
+
+    // A SoundFont voice's modulation for the next `frames` of the block, from frame `from`: the note's
+    // gain, pan, filter, drive, crush and the pitch wheel. Everything here reaches TSF or the chain
+    // once per call, so it holds across the piece the caller renders next.
+    const auto prepareSfVoice = [&](SoundfontVoice& sv, int t, int from, int frames) {
+        updateVoiceModulation(sv, frames, (float)sampleRate);
+
+        // The note's gain at the end of this piece, and — for a note armed this block — at its
+        // onset, where an envelope with an attack starts from zero. A finished AHD/ADSR still
+        // counts: its value is 0, and skipping it would bring the note back at full volume.
+        float noteVol   = sv.modDestValues[PARAM_VOL];
+        float onsetVol  = noteVol;
+        bool  hasVolEnv = false, volEnvDone = true;
+        for (int m = 0; m < 4; m++) {
+            VoiceModSlot& mod = sv.voiceMods[m];
+            if (mod.type == 0 || mod.stage == 0 || mod.dest != 1) continue;
+            if (mod.type == 3) {  // LFO: bipolar tremolo
+                noteVol  = fmaxf(0.0f, noteVol  * (1.0f + mod.envValue * mod.effectiveAmt));
+                onsetVol = fmaxf(0.0f, onsetVol * (1.0f + mod.envValue * mod.effectiveAmt));
+            } else if (mod.type == 1 || mod.type == 2 || mod.type == 4 || mod.type == 5) {
+                // Unipolar gain reduction. AHD/DRUM are done at stage 4, ADSR/TRIG at stage 5.
+                hasVolEnv = true;
+                if (mod.stage < ((mod.type == 2 || mod.type == 5) ? 5 : 4)) volEnvDone = false;
+                const float onsetEnv = mod.attackSamples > 0 ? 0.0f : 1.0f;
+                noteVol  = fmaxf(0.0f, noteVol  + (mod.envValue - 1.0f) * mod.effectiveAmt);
+                onsetVol = fmaxf(0.0f, onsetVol + (onsetEnv     - 1.0f) * mod.effectiveAmt);
+            }
+        }
+        sv.volGainFrom = sv.hasArmedNote ? onsetVol : sv.volGain;
+        sv.volGainTo   = noteVol;
+        // PAN modulation. A SoundFont voice has no panLeft/panRight gains in the mix loop — TSF
+        // pans on its own channel — so the modulated value goes back through
+        // tsf_channel_set_pan instead, guarded by the same |mod| > 0.001 test the sampler path
+        // uses so an unmodulated voice keeps whatever pan the note or a PAN effect gave it.
+        const bool panModded = fabsf(sv.params.mod[PARAM_PAN]) > 0.001f;
+        const float modPan = panModded ? fmaxf(0.0f, fminf(1.0f, sv.params.get(PARAM_PAN))) : 0.0f;
+
+        int volSlot = sv.sfSlot;
+        if (panModded && volSlot >= 0 && volSlot < MAX_SOUNDFONTS) {
+            tsf* h = soundfonts[volSlot].handle.load();
+            if (h) tsf_channel_set_pan(h, t, modPan);
+        }
+
+        // Every VOL envelope has finished: the note is over, or — with AMT below FF — held at a
+        // level it can no longer leave. Either way it ends, faded from where this piece's ramp
+        // leaves it, so a partial AMT cannot end in a step. (An armed note's envelopes have
+        // only just started, so this never ends a note before it is heard.)
+        if (hasVolEnv && volEnvDone && !sv.hasArmedNote) sv.startStopFade(DECLICK_SAMPLES, from);
+
+        // If filter mod is active, snapshot then recompute coefficients via InstrumentChain.
+        sv.chain.filter.snapshotCoeffs();
+        if (sv.chain.filter.enabled()) {
+            const int baseCut = (int)sv.params.base[PARAM_FILTER_CUT];
+            const int baseRes = (int)sv.params.base[PARAM_FILTER_RES];
+            int modCut = std::max(0, std::min(255,
+                (int)(sv.params.base[PARAM_FILTER_CUT] + sv.modDestValues[PARAM_FILTER_CUT])));
+            int modRes = std::max(0, std::min(255,
+                (int)(sv.params.base[PARAM_FILTER_RES] + sv.modDestValues[PARAM_FILTER_RES])));
+            if (modCut != baseCut || modRes != baseRes) {
+                sv.chain.filter.setParams(sv.chain.filter.type, modCut, modRes, sv.chain.filter.drive, sampleRate);
+            }
+        }
+        // Drive and crush off the bus, as the sampler's mix does — except that the SF chain does
+        // its own downsampling: there is no read address here to quantize.
+        sv.chain.drive.setDrive(std::max(0, std::min(255,
+            (int)(sv.params.base[PARAM_DRIVE] + sv.modDestValues[PARAM_DRIVE]))));
+        sv.chain.crush.setParams(
+            std::max(0, std::min(15, (int)(sv.params.base[PARAM_CRUSH]      + sv.modDestValues[PARAM_CRUSH]))),
+            std::max(0, std::min(15, (int)(sv.params.base[PARAM_DOWNSAMPLE] + sv.modDestValues[PARAM_DOWNSAMPLE]))));
+
+        sv.applyPitchMod((float)sampleRate, frames);
+    };
+
+    // One piece of one SoundFont voice — frames [from, to) of the block — rendered into sfBuf at the
+    // same frames, with the note's gain on it.
+    const auto renderSfPiece = [&](SoundfontVoice& sv, int t, tsf* h, int from, int to) {
+        // Honour the intra-block trigger offset (see the sampler mix loop): the note starts at its
+        // exact frame, and everything before it belongs to whatever this track was already playing.
+        // An armed note's onset always lies in the voice's first piece: its table's clocks start there.
+        int sfStart = from;
+        if (sv.startDelayFrames > 0) {
+            sfStart = std::max(from, std::min(sv.startDelayFrames, to));
+            sv.startDelayFrames = 0;
+        }
+        if (!sv.hasArmedNote) {
+            // A note-off dispatched mid-block is sent between two renders, so TSF's release begins on
+            // its frame. TSF steps its envelope per render call (in 64-sample chunks from the call's
+            // first frame), which is what makes the split land it exactly.
+            const int offAt = sv.pendingTsfOffAt;
+            if (offAt > from && offAt < to) {
+                tsf_render_float_channel(h, t, sfBuf + from * 2, offAt - from, 0 /* overwrite */);
+                tsf_channel_note_off(h, t, sv.pendingTsfOffNote);
+                tsf_render_float_channel(h, t, sfBuf + offAt * 2, to - offAt, 0 /* overwrite */);
+                sv.pendingTsfOffAt = -1;
+            } else {
+                // Due at or before this piece — or carried over at 0 from a block that did not
+                // render this voice.
+                if (offAt >= 0 && offAt <= from) {
+                    tsf_channel_note_off(h, t, sv.pendingTsfOffNote);
+                    sv.pendingTsfOffAt = -1;
+                }
+                tsf_render_float_channel(h, t, sfBuf + from * 2, to - from, 0 /* overwrite */);
+            }
+            applyGainRamp(sfBuf + from * 2, to - from, sv.volGainFrom, sv.volGainTo);
+        } else {
+            // ⚠️⚠️ A NOTE THAT STEALS ANOTHER IS RENDERED IN TWO PASSES WITH A FADE BETWEEN THEM,
+            // AND EVERY PIECE OF THAT IS LEVERAGE AGAINST THE SAME CRACK.
+            //
+            // Pass one is the note being REPLACED, rendered up to `fadeEnd` — past the new note's own
+            // onset — so the old note is faded out rather than cut at a block edge. That is what the
+            // armed note is for: the old TSF voices are killed only once their last samples exist.
+            //
+            // ⚠️ AND THE FADE IS OURS, NOT TSF'S — this is the part that is not obvious. TSF computes
+            // its amplitude envelope ONCE PER 64-SAMPLE BLOCK and holds it flat across it
+            // (`gainMono = noteGain * v->ampenv.level` in tsf_voice_render). Its short release,
+            // `tsf_voice_endquick`, drops the level to 26% at the first of those boundaries — so
+            // asking TSF to fade a stolen note out quickly buys a smaller step, not no step. A ramp
+            // applied to the rendered samples has no such granularity, which is also why the sampler
+            // pool fades its own steals here rather than in a voice (DECLICK_SAMPLES, audio-defs.h —
+            // the same length).
+            //
+            // `fadeEnd` is clamped to the piece, so the ramp slides EARLIER when a note lands near the
+            // end of one; a note landing at frame 0 still gets the full 64 samples. It is
+            // `min(fadeEnd, DECLICK_SAMPLES)` long either way, never a stub.
+            const int fadeEnd   = std::min(to, sfStart + DECLICK_SAMPLES);
+            const int rampStart = std::max(from, fadeEnd - DECLICK_SAMPLES);
+            const int rampLen   = fadeEnd - rampStart;
+            tsf_render_float_channel(h, t, sfBuf + from * 2, fadeEnd - from, 0 /* overwrite */);
+            // The old note keeps the gain it ended the last piece on — the new note's envelope has
+            // already replaced the mods, and must not reach the note it cuts.
+            applyGainRamp(sfBuf + from * 2, fadeEnd - from, sv.volGain, sv.volGain);
+            for (int i = rampStart; i < fadeEnd; i++) {
+                const float g = (float)(fadeEnd - i - 1) / (float)(rampLen > 1 ? rampLen - 1 : 1);
+                sfBuf[i * 2]     *= g;
+                sfBuf[i * 2 + 1] *= g;
+            }
+            // Now the old voices can be cut: the samples they contributed are already at zero.
+            sv.fireArmedNote(h);
+            // Rendered apart and ADDED — [sfStart, fadeEnd) still holds the tail of the fade,
+            // and the two notes carry different gains across it.
+            const int noteFrames = to - sfStart;
+            if (noteFrames > 0) {
+                tsf_render_float_channel(h, t, sfNoteBuf, noteFrames, 0 /* overwrite */);
+                applyGainRamp(sfNoteBuf, noteFrames, sv.volGainFrom, sv.volGainTo);
+                for (int i = 0; i < noteFrames * 2; i++) sfBuf[sfStart * 2 + i] += sfNoteBuf[i];
+            }
+        }
+        sv.volGain = sv.volGainTo;
+    };
+
+    // ⚠️⚠️ **EACH SOUNDFONT VOICE IS RENDERED IN PIECES CUT WHERE ITS TABLE PLAYS A ROW**, as the sampler
+    // voices are above: table, modulation, then TSF up to the next row. TSF takes pitch and pan per
+    // render call, so a row's transpose starts on its own frame. The instrument chain runs per piece,
+    // its filter ramping across it; the gate, the sends and the output run once across the block.
     {
         // sfBuf (per-track SF render, PROCESS_SUBBLOCK frames * 2 channels) is an engine member; it is
         // memset per use below before each tsf render.
-        for (int t = 0; t < SF_VOICE_COUNT; t++) {
-            SoundfontVoice& sv = sfVoices[t];
-            if (!sv.isActive) continue;
-
-            updateVoiceModulation(sv, numFrames, (float)sampleRate);
-
-            // The note's gain at the end of this block, and — for a note armed this block — at its
-            // onset, where an envelope with an attack starts from zero. A finished AHD/ADSR still
-            // counts: its value is 0, and skipping it would bring the note back at full volume.
-            float noteVol   = sv.modDestValues[PARAM_VOL];
-            float onsetVol  = noteVol;
-            bool  hasVolEnv = false, volEnvDone = true;
-            for (int m = 0; m < 4; m++) {
-                VoiceModSlot& mod = sv.voiceMods[m];
-                if (mod.type == 0 || mod.stage == 0 || mod.dest != 1) continue;
-                if (mod.type == 3) {  // LFO: bipolar tremolo
-                    noteVol  = fmaxf(0.0f, noteVol  * (1.0f + mod.envValue * mod.effectiveAmt));
-                    onsetVol = fmaxf(0.0f, onsetVol * (1.0f + mod.envValue * mod.effectiveAmt));
-                } else if (mod.type == 1 || mod.type == 2 || mod.type == 4 || mod.type == 5) {
-                    // Unipolar gain reduction. AHD/DRUM are done at stage 4, ADSR/TRIG at stage 5.
-                    hasVolEnv = true;
-                    if (mod.stage < ((mod.type == 2 || mod.type == 5) ? 5 : 4)) volEnvDone = false;
-                    const float onsetEnv = mod.attackSamples > 0 ? 0.0f : 1.0f;
-                    noteVol  = fmaxf(0.0f, noteVol  + (mod.envValue - 1.0f) * mod.effectiveAmt);
-                    onsetVol = fmaxf(0.0f, onsetVol + (onsetEnv     - 1.0f) * mod.effectiveAmt);
-                }
-            }
-            sv.volGainFrom = sv.hasArmedNote ? onsetVol : sv.volGain;
-            sv.volGainTo   = noteVol;
-            // PAN modulation. A SoundFont voice has no panLeft/panRight gains in the mix loop — TSF
-            // pans on its own channel — so the modulated value goes back through
-            // tsf_channel_set_pan instead, guarded by the same |mod| > 0.001 test the sampler path
-            // uses so an unmodulated voice keeps whatever pan the note or a PAN effect gave it.
-            const bool panModded = fabsf(sv.params.mod[PARAM_PAN]) > 0.001f;
-            const float modPan = panModded ? fmaxf(0.0f, fminf(1.0f, sv.params.get(PARAM_PAN))) : 0.0f;
-
-            int volSlot = sv.sfSlot;
-            if (panModded && volSlot >= 0 && volSlot < MAX_SOUNDFONTS) {
-                tsf* h = soundfonts[volSlot].handle.load();
-                if (h) tsf_channel_set_pan(h, t, modPan);
-            }
-
-            // Every VOL envelope has finished: the note is over, or — with AMT below FF — held at a
-            // level it can no longer leave. Either way it ends, faded from where this block's ramp
-            // leaves it, so a partial AMT cannot end in a step. (An armed note's envelopes have
-            // only just started, so this never ends a note before it is heard.)
-            if (hasVolEnv && volEnvDone && !sv.hasArmedNote) sv.startStopFade(DECLICK_SAMPLES);
-
-            // If filter mod is active, snapshot then recompute coefficients via InstrumentChain.
-            sv.chain.filter.snapshotCoeffs();
-            if (sv.chain.filter.enabled()) {
-                const int baseCut = (int)sv.params.base[PARAM_FILTER_CUT];
-                const int baseRes = (int)sv.params.base[PARAM_FILTER_RES];
-                int modCut = std::max(0, std::min(255,
-                    (int)(sv.params.base[PARAM_FILTER_CUT] + sv.modDestValues[PARAM_FILTER_CUT])));
-                int modRes = std::max(0, std::min(255,
-                    (int)(sv.params.base[PARAM_FILTER_RES] + sv.modDestValues[PARAM_FILTER_RES])));
-                if (modCut != baseCut || modRes != baseRes) {
-                    sv.chain.filter.setParams(sv.chain.filter.type, modCut, modRes, sv.chain.filter.drive, sampleRate);
-                }
-            }
-            // Drive and crush off the bus, as the sampler's mix does — except that the SF chain does
-            // its own downsampling: there is no read address here to quantize.
-            sv.chain.drive.setDrive(std::max(0, std::min(255,
-                (int)(sv.params.base[PARAM_DRIVE] + sv.modDestValues[PARAM_DRIVE]))));
-            sv.chain.crush.setParams(
-                std::max(0, std::min(15, (int)(sv.params.base[PARAM_CRUSH]      + sv.modDestValues[PARAM_CRUSH]))),
-                std::max(0, std::min(15, (int)(sv.params.base[PARAM_DOWNSAMPLE] + sv.modDestValues[PARAM_DOWNSAMPLE]))));
-
-            sv.applyPitchMod((float)sampleRate, numFrames);
-        }
-
         const TrackBufferMix mix{ output, numFrames, trackVolStart, trackVolEnd, gateStart, gateEnd,
                                   octaWanted, monitoredInstrId };
         for (int t = 0; t < SF_VOICE_COUNT; t++) {
             SoundfontVoice& sv = sfVoices[t];
-            int slot = sv.sfSlot;
-            if (!sv.isActive || slot < 0 || slot >= MAX_SOUNDFONTS) continue;
+            if (!sv.isActive) continue;
 
-            memset(sfBuf, 0, sizeof(float) * numFrames * 2);
-            // Honour the intra-block trigger offset (see the sampler mix loop): the note starts at its
-            // exact frame, and everything before it belongs to whatever this track was already playing.
-            int sfStart = 0;
-            if (sv.startDelayFrames > 0) {
-                sfStart = std::min(sv.startDelayFrames, numFrames);
-                sv.startDelayFrames = 0;
-            }
-            bool rendered = false;
-            {
-                tsf* h = soundfonts[slot].handle.load();   // valid until this block ends
-                if (h && !sv.hasArmedNote) {
-                    // A note-off dispatched mid-block is sent between the two halves of the render,
-                    // so TSF's release begins on its frame. TSF steps its envelope per render call
-                    // (in 64-sample chunks from the call's first frame), which is what makes the
-                    // split land it exactly.
-                    const int offAt = sv.pendingTsfOffAt;
-                    if (offAt > 0 && offAt < numFrames) {
-                        tsf_render_float_channel(h, t, sfBuf, offAt, 0 /* overwrite */);
-                        tsf_channel_note_off(h, t, sv.pendingTsfOffNote);
-                        tsf_render_float_channel(h, t, sfBuf + offAt * 2, numFrames - offAt, 0 /* overwrite */);
-                    } else {
-                        // Pending at 0: carried over from a block that did not render this voice.
-                        if (offAt >= 0) tsf_channel_note_off(h, t, sv.pendingTsfOffNote);
-                        tsf_render_float_channel(h, t, sfBuf, numFrames, 0 /* overwrite */);
-                    }
-                    sv.pendingTsfOffAt = -1;
-                    applyGainRamp(sfBuf, numFrames, sv.volGainFrom, sv.volGainTo);
-                    rendered = true;
-                } else if (h) {
-                    // ⚠️⚠️ A NOTE THAT STEALS ANOTHER IS RENDERED IN TWO PASSES WITH A FADE BETWEEN THEM,
-                    // AND EVERY PIECE OF THAT IS LEVERAGE AGAINST THE SAME CRACK.
-                    //
-                    // Pass one is the note being REPLACED, rendered up to `fadeEnd` — past the new
-                    // note's own onset. It used to be rendered not at all: the trigger note_on'd where
-                    // the note was SCHEDULED, one pass earlier, killing the old TSF voices before a
-                    // single frame of this block existed, so the block came out silent up to `sfStart`
-                    // and the previous note ended in a step at the block boundary, at whatever amplitude
-                    // its waveform happened to be at. That is what the armed note is for.
-                    //
-                    // ⚠️ AND THE FADE IS OURS, NOT TSF'S — this is the part that is not obvious. TSF
-                    // computes its amplitude envelope ONCE PER 64-SAMPLE BLOCK and holds it flat across
-                    // it (`gainMono = noteGain * v->ampenv.level` in tsf_voice_render). Its short
-                    // release, `tsf_voice_endquick`, drops the level to 26% at the first of those
-                    // boundaries — so asking TSF to fade a stolen note out quickly buys a smaller step,
-                    // not no step. Measured: still 0.33 of peak. A ramp applied to the rendered samples
-                    // has no such granularity, which is also why the sampler pool fades its own steals
-                    // here rather than in a voice (DECLICK_SAMPLES, audio-defs.h — the same length).
-                    //
-                    // `fadeEnd` is clamped to the block, so the ramp slides EARLIER when a note lands
-                    // near the end of one; a note landing at frame 0 still gets the full 64 samples. It
-                    // is `min(fadeEnd, DECLICK_SAMPLES)` long either way, never a stub.
-                    const int fadeEnd   = std::min(numFrames, sfStart + DECLICK_SAMPLES);
-                    const int rampStart = std::max(0, fadeEnd - DECLICK_SAMPLES);
-                    const int rampLen   = fadeEnd - rampStart;
-                    tsf_render_float_channel(h, t, sfBuf, fadeEnd, 0 /* overwrite */);
-                    // The old note keeps the gain it ended the last block on — the new note's
-                    // envelope has already replaced the mods, and must not reach the note it cuts.
-                    applyGainRamp(sfBuf, fadeEnd, sv.volGain, sv.volGain);
-                    for (int i = rampStart; i < fadeEnd; i++) {
-                        const float g = (float)(fadeEnd - i - 1) / (float)(rampLen > 1 ? rampLen - 1 : 1);
-                        sfBuf[i * 2]     *= g;
-                        sfBuf[i * 2 + 1] *= g;
-                    }
-                    // Now the old voices can be cut: the samples they contributed are already at zero.
-                    sv.fireArmedNote(h);
-                    // Rendered apart and ADDED — [sfStart, fadeEnd) still holds the tail of the fade,
-                    // and the two notes carry different gains across it.
-                    const int noteFrames = numFrames - sfStart;
-                    if (noteFrames > 0) {
-                        tsf_render_float_channel(h, t, sfNoteBuf, noteFrames, 0 /* overwrite */);
-                        applyGainRamp(sfNoteBuf, noteFrames, sv.volGainFrom, sv.volGainTo);
-                        for (int i = 0; i < noteFrames * 2; i++) sfBuf[sfStart * 2 + i] += sfNoteBuf[i];
-                    }
-                    rendered = true;
+            const int slot = sv.sfSlot;
+            tsf* h = (slot >= 0 && slot < MAX_SOUNDFONTS) ? soundfonts[slot].handle.load()  // valid until
+                                                          : nullptr;                          // this block ends
+            if (h) memset(sfBuf, 0, sizeof(float) * numFrames * 2);
+            for (int from = 0; from < numFrames; ) {
+                int to = numFrames;
+                if (sv.tableId >= 0) to = from + processTableTick(sv, from, numFrames - from, sampleRate);
+                prepareSfVoice(sv, t, from, to - from);
+                if (h) {
+                    renderSfPiece(sv, t, h, from, to);
+                    chainTrackPiece(sv, t, sfBuf, mix, from, to);
                 }
+                from = to;
             }
-            if (!rendered) continue;
-            sv.volGain = sv.volGainTo;
+            if (!h) continue;
 
             bool stopFadeDone = false;
             const float trackPeak = mixTrackBuffer(sv, t, sfBuf, mix, stopFadeDone);

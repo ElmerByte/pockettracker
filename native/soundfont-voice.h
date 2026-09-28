@@ -53,11 +53,11 @@ struct SoundfontVoice : public IAudioVoice {
     // Release tail: true after noteOff() — keeps rendering while TSF decays to silence.
     bool  isReleasingOnly  = false;
 
-    // The note's gain — VOL, table and phrase volume and the VOL mods — ramped per sample over the
-    // rendered block. ⚠️ It must NOT go through tsf_channel_set_volume: that is one value per block,
+    // The note's gain — VOL, table and phrase volume and the VOL mods — ramped per sample over each
+    // rendered piece. ⚠️ It must NOT go through tsf_channel_set_volume: that is one value per render,
     // and a fast envelope becomes a staircase that clicks at every block boundary — which is why the
-    // track fader does not go through it either. `volGain` is where the last block ended; From/To
-    // are this block's.
+    // track fader does not go through it either. `volGain` is where the last piece ended; From/To
+    // are this piece's.
     float volGain     = 1.0f;
     float volGainFrom = 1.0f;
     float volGainTo   = 1.0f;
@@ -158,7 +158,7 @@ struct SoundfontVoice : public IAudioVoice {
     float render(float*, int) override { return 0.0f; }
 
     // Per-track stereo effect chain, run on the rendered TSF buffer. Its live values are on the
-    // ParamBus, as the sampler's are; the engine writes them into the chain once per block.
+    // ParamBus, as the sampler's are; the engine writes them into the chain once per rendered piece.
     InstrumentChain chain;
 
     // ── Audio-thread-only methods (no lock needed) ──────────────────────────
@@ -213,8 +213,8 @@ struct SoundfontVoice : public IAudioVoice {
         reset_table_lanes(lanes, ticRates, startRows, octave, pitch);
     }
 
-    // Advance pitch LFO/slide and write MIDI pitch wheel to the shared handle.
-    // Called once per audio block, BEFORE the per-slot render. Audio thread only.
+    // Advance pitch LFO/slide by `numFrames` and write MIDI pitch wheel to the shared handle.
+    // Called before each render of this channel. Audio thread only.
     void applyPitchMod(float sampleRate, int numFrames);
 
     // Reset voice state when the owning slot is unloaded.
