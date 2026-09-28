@@ -79,6 +79,17 @@ export POCKETTRACKER_HOME="$GAMEDIR/data"
 # `Xbox 360 Controller` (the name in PortMaster's db) — two names, so the file mapping is in force.
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 
+# Miyoo Flip on spruce: play straight to the sound chip with a 256-frame buffer (~10 ms queued)
+# instead of through the dmix spruce writes into $HOME/.asoundrc (1024-frame steps, ~21-43 ms).
+# The Flip's volume is on the chip, so it still works. ⚠️ Only when .asoundrc is spruce's PLAIN dmix
+# default: a Bluetooth headset (bluealsa) or the headphone multiplier ("dmixer") live in that file
+# and a direct open would bypass them. If the chip will not open, the app falls back to the default.
+if [ "$(cat /proc/asound/card0/id 2>/dev/null)" = "rockchiprk817" ] \
+   && grep -q 'slave\.pcm "dmix"' "$HOME/.asoundrc" 2>/dev/null; then
+  export AUDIODEV="hw:0,0"
+  export POCKETTRACKER_AUDIO_FRAMES=256
+fi
+
 # No LD_LIBRARY_PATH and no libs.aarch64: this port deliberately links the DEVICE's libSDL2, which
 # is the copy patched for its display (KMSDRM) and audio (ALSA). Shipping our own would override
 # the one that knows the hardware. The binary needs SDL >= 2.0.18 (it calls SDL_GetTicks64); every

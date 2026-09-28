@@ -40,9 +40,9 @@ uint64_t now_ns() {
 // Frames per callback. 512 @ 48 kHz ≈ 10.7 ms. It is ABOVE the engine's PROCESS_SUBBLOCK and that is
 // fine: processLiveBlock chunks to it, so this number is a latency choice and never a correctness one.
 //
-// ⚠️ **IT IS A REQUEST, AND NOTHING MEASURED HAS EVER GRANTED IT** — WASAPI hands back its own 10 ms
-// period (480 frames at 48 kHz) for anything from 64 to 2048, and the Flip's ALSA its own 1024. Only
-// the size read back in openStream is the one the callback actually runs at.
+// ⚠️ **IT IS A REQUEST.** WASAPI hands back its own 10 ms period (480 frames at 48 kHz) for anything
+// from 64 to 2048, and an ALSA dmix its own configured period (1024 on the Flip's default). Only the
+// size read back in openStream is the one the callback actually runs at.
 constexpr int FRAMES_PER_CALLBACK = 512;
 
 // The rate to ask for when the platform cannot be asked what it actually runs. ⚠️ A REQUEST, never an
@@ -51,10 +51,8 @@ constexpr int FRAMES_PER_CALLBACK = 512;
 //
 // ⚠️⚠️ **48000 BECAUSE ASKING FOR 44100 BOUGHT A SILENT CONVERSION ON EVERY DEVICE MEASURED.** The
 // layer that converts is also the layer that answers questions about itself: ALSA's plug accepts any
-// rate, so the app was told 44100 while the driver read 48000, and the odd 940-frame callback it
-// reported was the hardware's own 1024-frame period divided by 44100/48000. Asked for 48000 the same
-// device reports 1024. ⚠️ It removes a conversion and NOT latency — the buffer's duration is
-// unchanged (21.32 → 21.33 ms on that device).
+// rate, so the app was told 44100 while a 48 kHz dmix did the mixing. ⚠️ It removes a conversion and
+// NOT latency — the buffer's duration is the same either way.
 //
 // ⚠️⚠️ **ON WINDOWS THIS IS A FALLBACK AND NOTHING MORE** — `windows_endpoint_rate()` below. A desktop
 // commonly has several outputs at different rates, and which one is in charge changes the moment a
@@ -127,9 +125,9 @@ const char* rate_source_text(RateSource s) {
 /**
  * The size to ask for — `POCKETTRACKER_AUDIO_FRAMES` overrides the default.
  *
- * A diagnostic and deliberately NOT a setting: it sweeps a device for the smallest buffer that
- * device will honour, without a rebuild per size. Rounded DOWN to a power of two (SDL's contract for
- * `samples`) and clamped to 32..8192 — a bad value is refused on stderr, since a request that lands
+ * Not a user setting: a launcher sets it where it knows the device (the PortMaster script on the
+ * Flip), and it sweeps a device without a rebuild per size. Rounded DOWN to a power of two (SDL's
+ * contract for `samples`) and clamped to 32..8192 — a bad value is refused on stderr, since a request that lands
  * as garbage looks exactly like a device that ignored it.
  */
 int requested_frames() {
@@ -191,9 +189,9 @@ void SDLCALL SdlAudioEngine::audioCallback(void* userdata, Uint8* out, int lenBy
     // SDL hands us a byte length; the engine wants frames.
     const int numFrames = lenBytes / int(sizeof(float)) / self->channels_;
 
-    // ⚠️ `numFrames` and not the constant we asked for: this is the size the DEVICE chose, which on the
-    // Flip is 940 where 512 was requested. Relaxed atomics only — nothing here may block. Off unless
-    // POCKETTRACKER_LATENCY=1, and one cached bool when it is.
+    // ⚠️ `numFrames` and not the constant we asked for: this is the size the DEVICE chose, which through
+    // a dmix is its own period whatever was requested. Relaxed atomics only — nothing here may block.
+    // Off unless POCKETTRACKER_LATENCY=1, and one cached bool when it is.
     latency::audio_callback(numFrames, self->sampleRate_);
 
     // Pure SDL glue — the exact mirror of OboeAudioEngine::onAudioReady. processLiveBlock does
@@ -263,8 +261,21 @@ bool SdlAudioEngine::openStream() {
     // insert a format shim (and possibly a resampler) underneath the DSP, and processAudioBlock's
     // contract is stereo float — a contract the engine guards rather than assumes. Failing loudly
     // here beats sounding subtly wrong on one CFW.
-    device_ = SDL_OpenAudioDevice(nullptr, 0, &want, &got,
-                                  SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
+    const int allow = SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_SAMPLES_CHANGE;
+    device_ = SDL_OpenAudioDevice(nullptr, 0, &want, &got, allow);
+
+#ifndef _WIN32
+    // A launcher may point ALSA at the chip itself (`AUDIODEV=hw:0,0`, the PortMaster script). That
+    // open is exclusive, so if anything else holds the chip, play through the default device instead
+    // of not at all. SDL reads AUDIODEV at open time, so unsetting it is enough.
+    if (device_ == 0 && std::getenv("AUDIODEV") != nullptr) {
+        std::fprintf(stderr, "audio:   AUDIODEV=%s failed (%s), trying the default device\n",
+                     std::getenv("AUDIODEV"), SDL_GetError());
+        unsetenv("AUDIODEV");
+        device_ = SDL_OpenAudioDevice(nullptr, 0, &want, &got, allow);
+    }
+#endif
+
     if (device_ == 0) {
         std::fprintf(stderr, "SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
         return false;
@@ -280,7 +291,7 @@ bool SdlAudioEngine::openStream() {
     // cannot fire until the SDL_PauseAudioDevice below — no race on these three fields.
     sampleRate_   = got.freq;
     channels_     = got.channels;
-    bufferFrames_ = got.samples;  // ⚠️ the SIZE THE DEVICE CHOSE — 441 here, 940 on the Flip, 512 asked
+    bufferFrames_ = got.samples;  // ⚠️ the SIZE THE DEVICE CHOSE, not the one asked
 
     // Hand the negotiated rate to the core, which caches it for getSampleRate() and every bit of
     // pitch/tic math. Same contract as OboeAudioEngine::openStream — the core never reaches into a
@@ -295,10 +306,12 @@ bool SdlAudioEngine::openStream() {
     // only way to tell a device that rounded the request from one that ignored it.
     //
     // ⚠️ Neither half is a reading of the HARDWARE. See PREFERRED_RATE.
+    const char* audiodev = std::getenv("AUDIODEV");
     std::printf("audio:   %d Hz, %d ch, %d frames/callback (%.1f ms at least), asked %d Hz (%s) / %d "
-                "frames, driver=%s\n",
+                "frames, driver=%s, device=%s\n",
                 sampleRate_, channels_, bufferFrames_, 1000.0 * bufferFrames_ / sampleRate_,
-                askedRate, rate_source_text(rateSource), askedFrames, SDL_GetCurrentAudioDriver());
+                askedRate, rate_source_text(rateSource), askedFrames, SDL_GetCurrentAudioDriver(),
+                audiodev != nullptr ? audiodev : "default");
     return true;
 }
 
