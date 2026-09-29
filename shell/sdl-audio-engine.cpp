@@ -11,6 +11,10 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "alsa-route.h"
 #endif
+#if defined(__linux__) && defined(PT_HANDHELD)
+#include <pthread.h>
+#include <sched.h>
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -233,6 +237,26 @@ void choose_linux_route(int& frames) {
 }
 #endif
 
+#if defined(__linux__) && defined(PT_HANDHELD)
+/**
+ * Put the calling (audio) thread on SCHED_FIFO, so a busy UI or system thread cannot hold its wake-up
+ * back — with 2 × 256 frames that costs the whole margin in ~5 ms.
+ *
+ * ⚠️ NOT SDL's `SDL_THREAD_FORCE_REALTIME_TIME_CRITICAL`: that goes through rtkit over D-Bus, which a
+ * handheld CFW does not run, and when it fails SDL leaves the thread at nice 0 — WORSE than the −20
+ * it sets without the hint. A port runs as root, so the kernel is asked directly. Priority 10: above
+ * every ordinary thread, below the kernel's interrupt threads (50), which must run to wake this one.
+ */
+void raise_audio_thread_priority() {
+    sched_param p{};
+    p.sched_priority = 10;
+    const int err = pthread_setschedparam(pthread_self(), SCHED_FIFO, &p);
+    if (err == 0) std::printf("audio:   callback thread on SCHED_FIFO %d\n", p.sched_priority);
+    else std::printf("audio:   callback thread left as SDL set it (SCHED_FIFO refused: %s)\n", std::strerror(err));
+    std::fflush(stdout);
+}
+#endif
+
 }  // namespace
 
 SdlAudioEngine::SdlAudioEngine(AudioEngine* core) : core_(core) {}
@@ -241,6 +265,14 @@ SdlAudioEngine::~SdlAudioEngine() { closeStream(); }
 
 void SDLCALL SdlAudioEngine::audioCallback(void* userdata, Uint8* out, int lenBytes) {
     auto* self = static_cast<SdlAudioEngine*>(userdata);
+
+#if defined(__linux__) && defined(PT_HANDHELD)
+    static bool priorityRaised = false;   // the audio thread is the only caller
+    if (!priorityRaised) {
+        priorityRaised = true;
+        raise_audio_thread_priority();
+    }
+#endif
 
     // SDL hands us a byte length; the engine wants frames.
     const int numFrames = lenBytes / int(sizeof(float)) / self->channels_;
