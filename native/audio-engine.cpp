@@ -125,6 +125,12 @@ void AudioEngine::stopAll() {
 
 void AudioEngine::stopAllRamped() {
     stopRampRequested.store(true, std::memory_order_release);
+    stoppedSinceTake.store(true, std::memory_order_relaxed);
+}
+
+void AudioEngine::startTake() {
+    if (stoppedSinceTake.exchange(false, std::memory_order_relaxed))
+        ottRestartRequested.store(true, std::memory_order_release);
 }
 
 void AudioEngine::startStopRamp(int64_t blockStartFrame) {

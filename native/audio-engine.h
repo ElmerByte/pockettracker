@@ -257,6 +257,14 @@ public:
      */
     void stopAllRamped();
 
+    /**
+     * A take is starting — every play verb calls this BEFORE it schedules, so the audio thread sees
+     * the request no later than the take's first note. A take that follows a stop starts OTT afresh
+     * (OttModule::restart): what OTT holds after a stop is the previous take's fading tail.
+     * A request, taken at the top of the next block, like stopAllRamped().
+     */
+    void startTake();
+
     // Platform hook: the audio shell installs a callback that restarts the output stream if the
     // platform paused it (Oboe today; ALSA/SDL on Linux). The Kotlin path called
     // backend.resumeStream() before every scheduled note; songcore's consumer calls requestResume()
@@ -1262,6 +1270,8 @@ private:
     // processAudioBlock is where the reason it has to exist at all is written down.
     std::atomic<int64_t> stopRampEndFrame{-1};
     std::atomic<bool>    stopRampRequested{false};   // stopAllRamped() → the next block's top
+    std::atomic<bool>    stoppedSinceTake{false};     // stopAllRamped() → the next startTake()
+    std::atomic<bool>    ottRestartRequested{false};  // startTake() → the next block's top
     void startStopRamp(int64_t blockStartFrame);
 
     // Session entropy mixed into per-note RNG seeds (RND/DRNK LFO). Reseeded from the wall

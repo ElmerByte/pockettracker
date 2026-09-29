@@ -124,10 +124,15 @@ struct BandCompressor {
 // Triggered on: disabled→enabled, resetForRender, and auto-reset.
 //
 // Auto-reset: after SILENCE_RESET_FRAMES of silence the module resets DSP and
-// starts a warmup. This ensures every playback-start-after-silence gets the
-// warmup rather than the LR4 filter-transient + per-band compression artifact
-// that sounds like a fade-in. Depth changes while enabled do NOT reset (avoids
-// compressors losing their gain state during key-repeat parameter sweeps).
+// starts a warmup, rather than the LR4 filter-transient + per-band compression
+// artifact that sounds like a fade-in. Depth changes while enabled do NOT reset
+// (avoids compressors losing their gain state during key-repeat parameter sweeps).
+//
+// ⚠️ SILENCE ALONE DOES NOT COVER A RESTART. A START soon after a STOP, or one
+// with a reverb tail still ringing, never sees 500 ms of silence — and in that
+// gap the upward halves have been lifting the fading tail by up to +22 dB, which
+// the first note of the new take then meets. The engine calls restart() for
+// every take that follows a stop.
 // ===========================================================================
 struct OttModule {
     LRCrossover    xover;
@@ -174,13 +179,16 @@ struct OttModule {
         // Reset DSP state only on the disabled→enabled transition.
         // Resetting on every depth change (e.g. key-repeat while sweeping depth) would
         // prevent the compressors from ever building up gain, making OTT inaudible.
-        if (!wasEnabled && enabled) {
-            xover.init(sampleRate, XOVER_LOW, XOVER_HIGH);
-            bandLow.reset();
-            bandMid.reset();
-            bandHigh.reset();
-            warmupRemaining = WARMUP_SAMPLES;
-        }
+        if (!wasEnabled && enabled) restart();
+    }
+
+    // The DSP from zero, behind the dry→wet warmup fade.
+    void restart() {
+        xover.init(sampleRate, XOVER_LOW, XOVER_HIGH);
+        bandLow.reset();
+        bandMid.reset();
+        bandHigh.reset();
+        warmupRemaining = WARMUP_SAMPLES;
     }
 
     // Called by RenderController before offline render. Resets all DSP state and
@@ -191,12 +199,8 @@ struct OttModule {
         depth   = d;
         enabled = (d > 0.f);
         if (enabled) {
-            xover.init(sampleRate, XOVER_LOW, XOVER_HIGH);
-            bandLow.reset();
-            bandMid.reset();
-            bandHigh.reset();
-            warmupRemaining = WARMUP_SAMPLES;
-            silenceCounter  = 0;
+            restart();
+            silenceCounter = 0;
         }
     }
 
@@ -213,11 +217,7 @@ struct OttModule {
         if (!hasSignal) {
             if (silenceCounter < SILENCE_RESET_FRAMES) silenceCounter += numFrames;
         } else {
-            if (silenceCounter >= SILENCE_RESET_FRAMES) {
-                xover.init(sampleRate, XOVER_LOW, XOVER_HIGH);
-                bandLow.reset(); bandMid.reset(); bandHigh.reset();
-                warmupRemaining = WARMUP_SAMPLES;
-            }
+            if (silenceCounter >= SILENCE_RESET_FRAMES) restart();
             silenceCounter = 0;
         }
 

@@ -250,16 +250,16 @@ class SongcoreHost {
     // ⚠️ CHAIN and PHRASE take the MIXER TRACK they belong to, defaulted to 0. It is what gives them
     // the arrangement's fader, mute, voice slot and per-track FX instead of channel 1's; the default
     // is what keeps every tool caller — and its goldens — asking for track 0 unchanged.
-    int64_t play_song(int startRow)   { sync_clock(); seq_.playSong(startRow);     return after_play(); }
+    int64_t play_song(int startRow)   { before_play(); seq_.playSong(startRow);     return after_play(); }
     /** LIVE mode from a standing start: `mask` bit N launches track N at `songRow`, the rest begin silent. */
     int64_t play_song_live(int songRow, int mask) {
-        sync_clock(); seq_.playSongLive(songRow, mask); return after_play();
+        before_play(); seq_.playSongLive(songRow, mask); return after_play();
     }
     int64_t play_chain(int chainId, int trackId = 0) {
-        sync_clock(); seq_.playChain(chainId, trackId);   return after_play();
+        before_play(); seq_.playChain(chainId, trackId);   return after_play();
     }
     int64_t play_phrase(int phraseId, int trackId = 0) {
-        sync_clock(); seq_.playPhrase(phraseId, trackId); return after_play();
+        before_play(); seq_.playPhrase(phraseId, trackId); return after_play();
     }
 
     /**
@@ -1510,6 +1510,11 @@ class SongcoreHost {
         int sr = engine_->getSampleRate();
         if (sr > 0) sampleRate_ = sr;
         seq_.set_sample_rate(sampleRate_);
+    }
+
+    void before_play() {
+        sync_clock();
+        if (engine_) engine_->startTake();
     }
 
     int64_t after_play() {

@@ -579,6 +579,8 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
     // Only voices that are FADING are touched: a note triggered by a restart is not, and one that
     // began fading inside the ramp window was within KILL_FADE_SAMPLES of silence anyway.
     if (stopRampRequested.exchange(false, std::memory_order_acquire)) startStopRamp(blockStartFrame);
+    // Before the drain below, so the take's first note already meets the fresh state.
+    if (ottRestartRequested.exchange(false, std::memory_order_acquire)) masterChain.ott.restart();
     {
         const int64_t rampEnd = stopRampEndFrame.load(std::memory_order_relaxed);
         if (rampEnd >= 0 && blockStartFrame >= rampEnd) {
