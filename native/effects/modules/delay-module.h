@@ -60,6 +60,10 @@ static constexpr float kDelayWobbleMaxSeconds = 0.007f;
 
 static constexpr float kDelayTwoPi = 6.28318530717958647692f;
 
+// TONE's range, 00 to FF, on an exponential curve.
+static constexpr float kDelayToneLowHz  = 356.4f;
+static constexpr float kDelayToneHighHz = 20000.0f;
+
 // ─── Where the echo starts to sing ───────────────────────────────────────────────────────────────
 //
 // Past `kDelayOscOnset` the loop stops being a plain repeat and becomes a tape machine pushed too
@@ -143,7 +147,7 @@ struct DelayModule {
     // clause has always demanded of anything lifting this loop.
     bool  pong      = false;   // a side's repeat feeds the OTHER line
     int   toneHex   = 0xFF;    // kept as the CELL, because the coefficient below depends on the rate
-    float toneCoeff = 1.0f;    // the regeneration one-pole's coefficient; 1 lets everything through
+    float toneCoeff = 1.0f;    // the one-pole on the line's input; 1 lets everything through
     float wobble    = 0.0f;    // 0..1, how far the read head drifts
 
     // The base position the drifting tap moves around. `DelayLine::SetDelay` keeps its own copy and
@@ -261,12 +265,11 @@ struct DelayModule {
 
     // The three character cells, together, because they arrive together from the project.
     //
-    // TONE is the brightness of the repeats, and maps 200 Hz–20 kHz by the same curve the reverb's
-    // DAMP cell uses — one curve in the tree, and the two cells that colour a send read the same way
-    // round. ⚠️ **FF IS NOT THE TOP OF THAT CURVE, IT IS THE FILTER SWITCHED OUT**: a one-pole at
-    // 20 kHz still takes a little off every pass, and a delay whose brightest setting is not the
-    // delay that shipped would have no way back to it. FE is 19 kHz and inaudibly below FF — the
-    // step is a discontinuity in the code and not in what anyone hears.
+    // TONE is the brightness of the repeats, 356 Hz–20 kHz on an exponential curve; lower than that
+    // and a few passes leave only mud. ⚠️ **FF IS NOT THE TOP OF THAT CURVE, IT IS THE FILTER
+    // SWITCHED OUT**: a one-pole at 20 kHz still takes a little off every pass, and a delay whose
+    // brightest setting is not the delay that shipped would have no way back to it. FE is 19.7 kHz
+    // and inaudibly below FF — the step is a discontinuity in the code and not in what anyone hears.
     void setCharacter(bool pongOn, int toneHexIn, int wobbleHex) {
         pong    = pongOn;
         toneHex = toneHexIn;
@@ -360,19 +363,12 @@ struct DelayModule {
             float fbL = pong ? readR : readL;
             float fbR = pong ? readL : readR;
 
-            if (filtered) {
-                toneStateL += toneCoeff * (fbL - toneStateL);
-                toneStateR += toneCoeff * (fbR - toneStateR);
-                fbL = toneStateL;
-                fbR = toneStateR;
-            }
-
             float regenL = fbL * feedback;
             float regenR = fbR * feedback;
 
             if (singing) {
                 // The band. A one-pole high-pass is the input less its own low-passed self, and the
-                // low-pass sits ON TOP of whatever TONE is doing rather than replacing it — the
+                // low-pass works alongside whatever TONE is doing rather than replacing it — the
                 // saturator below makes new harmonics every pass, and with nothing above them they
                 // stack into hiss instead of a note.
                 oscHpL += oscHpCoeff * (fbL - oscHpL);
@@ -399,8 +395,20 @@ struct DelayModule {
             //
             // ⚠️ So PONG deliberately DISCARDS the source's pan. That is what the name promises, and
             // PONG off is where a panned echo still lives.
-            delL.Write((pong ? (l + r) * 0.5f : l) + regenL);
-            delR.Write((pong ? 0.0f : r) + regenR);
+            float writeL = (pong ? (l + r) * 0.5f : l) + regenL;
+            float writeR = (pong ? 0.0f : r) + regenR;
+
+            // TONE filters what goes INTO the line, so the first repeat has passed it once and each
+            // later one once more. On the regeneration alone it would leave the first repeat clean.
+            if (filtered) {
+                toneStateL += toneCoeff * (writeL - toneStateL);
+                toneStateR += toneCoeff * (writeR - toneStateR);
+                writeL = toneStateL;
+                writeR = toneStateR;
+            }
+
+            delL.Write(writeL);
+            delR.Write(writeR);
             outL[i] = readL;
             outR[i] = readR;
         }
@@ -424,7 +432,7 @@ struct DelayModule {
     }
 
     void updateToneCoeff() {
-        const float cutoffHz = 200.0f * powf(100.0f, toneHex / 255.0f);
+        const float cutoffHz = kDelayToneLowHz * powf(kDelayToneHighHz / kDelayToneLowHz, toneHex / 255.0f);
         const float coeff    = 1.0f - expf(-kDelayTwoPi * cutoffHz / sampleRate);
         toneCoeff = fminf(1.0f, fmaxf(0.0f, coeff));
     }
