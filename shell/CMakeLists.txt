@@ -146,6 +146,7 @@ add_executable(pockettracker-sdl
         midi-out-winmm.cpp # the WINDOWS songcore::IMidiOut (MIDI plan B2);  empty TU elsewhere
         midi-out-alsa.cpp  # the LINUX   songcore::IMidiOut (MIDI plan B2b); empty TU elsewhere
         alsa-rawmidi.cpp   # the ONE libasound loader + rawmidi device walk (E5); empty TU elsewhere
+        alsa-route.cpp     # what stands between ALSA's default and the chip; empty TU elsewhere
         midi-in-base.cpp   # the platform-FREE half of a MIDI INPUT backend (E2): list, sink, counters
         midi-in-winmm.cpp  # the WINDOWS songcore::IMidiIn  (MIDI plan E2);  empty TU elsewhere
         midi-in-alsa.cpp   # the LINUX   songcore::IMidiIn  (MIDI plan E5);  empty TU elsewhere
@@ -160,6 +161,13 @@ add_executable(pockettracker-sdl
 # app.cpp's boot banner. A bug report arrives as a log file and a sentence, and without this the
 # version is only in the download's filename — which a reporter has usually thrown away.
 target_compile_definitions(pockettracker-sdl PRIVATE "PT_VERSION_STRING=\"${PT_VERSION}\"")
+
+# A handheld build may take the sound chip for itself (sdl-audio-engine.cpp): nothing else plays
+# there. A desktop build never does — an exclusive open would silence every other program.
+option(PT_HANDHELD "Build for a handheld (PortMaster): the audio may open the chip exclusively" OFF)
+if(PT_HANDHELD)
+    target_compile_definitions(pockettracker-sdl PRIVATE PT_HANDHELD=1)
+endif()
 
 # winmm — `midiOutShortMsg` and friends (midi-out-winmm.cpp). In every Windows install; no package,
 # no manifest capability.

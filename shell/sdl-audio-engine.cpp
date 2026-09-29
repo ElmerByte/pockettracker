@@ -6,6 +6,11 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "alsa-route.h"
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -44,6 +49,10 @@ uint64_t now_ns() {
 // from 64 to 2048, and an ALSA dmix its own configured period (1024 on the Flip's default). Only the
 // size read back in openStream is the one the callback actually runs at.
 constexpr int FRAMES_PER_CALLBACK = 512;
+
+// Asked instead where the route is known to honour a small buffer (`choose_linux_route`). Measured on
+// the Miyoo Flip straight to the chip: 256 held with 2× headroom; 128 had ~1 ms, 64 underran.
+constexpr int SMALL_FRAMES = 256;
 
 // The rate to ask for when the platform cannot be asked what it actually runs. ⚠️ A REQUEST, never an
 // assumption: `SDL_AUDIO_ALLOW_FREQUENCY_CHANGE` is set, so hardware that really runs 44.1 answers
@@ -125,8 +134,8 @@ const char* rate_source_text(RateSource s) {
 /**
  * The size to ask for — `POCKETTRACKER_AUDIO_FRAMES` overrides the default.
  *
- * Not a user setting: a launcher sets it where it knows the device (the PortMaster script on the
- * Flip), and it sweeps a device without a rebuild per size. Rounded DOWN to a power of two (SDL's
+ * Not a user setting: it sweeps a device without a rebuild per size, and overrides the size
+ * `choose_linux_route` would pick. Rounded DOWN to a power of two (SDL's
  * contract for `samples`) and clamped to 32..8192 — a bad value is refused on stderr, since a request that lands
  * as garbage looks exactly like a device that ignored it.
  */
@@ -176,6 +185,53 @@ int requested_rate(RateSource& source) {
     source = RateSource::FALLBACK;
     return PREFERRED_RATE;
 }
+
+#if defined(__linux__) && !defined(__ANDROID__)
+/**
+ * Pick the device and buffer size from what stands between the app and the chip (alsa-route.h).
+ *
+ * A sound server takes the small size and keeps volume and Bluetooth. A plain ALSA mixer chain is
+ * opened at its chip directly — on a handheld build only, since that open is exclusive. Anything else
+ * is left exactly as it was. An explicit AUDIODEV or POCKETTRACKER_AUDIO_FRAMES wins over all of it.
+ */
+void choose_linux_route(int& frames) {
+    const bool framesPinned = std::getenv("POCKETTRACKER_AUDIO_FRAMES") != nullptr;
+    if (const char* dev = std::getenv("AUDIODEV")) {
+        std::printf("audio:   route: AUDIODEV=%s given, not inspected\n", dev);
+        return;
+    }
+
+    const char* driver = SDL_GetCurrentAudioDriver();
+    if (driver && (std::strcmp(driver, "pipewire") == 0 || std::strcmp(driver, "pulseaudio") == 0)) {
+        if (!framesPinned) frames = SMALL_FRAMES;
+        std::printf("audio:   route: SDL talks to %s itself - a sound server, asking %d frames\n", driver,
+                    frames);
+        return;
+    }
+    if (!driver || std::strcmp(driver, "alsa") != 0) return;
+
+    const ptshell::DefaultRoute r = ptshell::inspect_default_route();
+    switch (r.route) {
+        case ptshell::AlsaRoute::DIRECT:
+#ifdef PT_HANDHELD
+            setenv("AUDIODEV", r.hw.c_str(), 1);
+            if (!framesPinned) frames = SMALL_FRAMES;
+            std::printf("audio:   route: %s - opening %s directly, asking %d frames\n", r.chain.c_str(),
+                        r.hw.c_str(), frames);
+#else
+            std::printf("audio:   route: %s - left shared (not a handheld build)\n", r.chain.c_str());
+#endif
+            break;
+        case ptshell::AlsaRoute::SERVER:
+            if (!framesPinned) frames = SMALL_FRAMES;
+            std::printf("audio:   route: %s - a sound server, asking %d frames\n", r.chain.c_str(), frames);
+            break;
+        case ptshell::AlsaRoute::LEAVE:
+            std::printf("audio:   route: %s - left as is\n", r.chain.c_str());
+            break;
+    }
+}
+#endif
 
 }  // namespace
 
@@ -240,7 +296,10 @@ bool SdlAudioEngine::openStream() {
         return false;
     }
 
-    const int  askedFrames = requested_frames();
+    int askedFrames = requested_frames();
+#if defined(__linux__) && !defined(__ANDROID__)
+    choose_linux_route(askedFrames);
+#endif
     RateSource rateSource  = RateSource::FALLBACK;
     const int  askedRate   = requested_rate(rateSource);
 
@@ -265,9 +324,9 @@ bool SdlAudioEngine::openStream() {
     device_ = SDL_OpenAudioDevice(nullptr, 0, &want, &got, allow);
 
 #ifndef _WIN32
-    // A launcher may point ALSA at the chip itself (`AUDIODEV=hw:0,0`, the PortMaster script). That
-    // open is exclusive, so if anything else holds the chip, play through the default device instead
-    // of not at all. SDL reads AUDIODEV at open time, so unsetting it is enough.
+    // AUDIODEV points ALSA at one device (`choose_linux_route`, or the user). An `hw:` open is
+    // exclusive, so if anything else holds the chip, play through the default device instead of not
+    // at all. SDL reads AUDIODEV at open time, so unsetting it is enough.
     if (device_ == 0 && std::getenv("AUDIODEV") != nullptr) {
         std::fprintf(stderr, "audio:   AUDIODEV=%s failed (%s), trying the default device\n",
                      std::getenv("AUDIODEV"), SDL_GetError());

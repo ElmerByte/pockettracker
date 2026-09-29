@@ -68,6 +68,7 @@ rm -rf "$BUILD"
 cmake -S "$SRC/shell" -B "$BUILD" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$SRC/shell/toolchain-aarch64.cmake" \
+    -DPT_HANDHELD=ON \
     -DSDL2_DIR="$SYSROOT/lib/cmake/SDL2"
 cmake --build "$BUILD"
 
