@@ -59,7 +59,7 @@
 #include "event.h"
 #include "midi_map.h"   // the knob gate: ctl_ch_covers, which CCs a mapping claims
 #include "model.h"
-#include "router.h"     // TrackInstruments — the shared "whose track is this?" rule
+#include "router.h"
 #include "seqlock.h"
 
 namespace songcore {
@@ -100,6 +100,8 @@ struct IMidiIn {
     virtual bool open(int index) = 0;
     virtual void close() = 0;
     virtual bool is_open() const = 0;
+    /** True once the open port has failed in a way only a reopen can cure (the cable was pulled). */
+    virtual bool broken() const { return false; }
 
     /** Where received bytes go. Set BEFORE `open`, cleared before the sink dies. */
     virtual void set_sink(IMidiInSink* sink) = 0;
@@ -367,9 +369,8 @@ struct MidiRouteInstrument {
 };
 
 /**
- * The routing facts of a project as one POD block: which channel each track hears, which instrument
- * answers for it (the IN INS row, what the sequencer last played there, and the UI's current one, in
- * that order), what each instrument bakes into a note, and which CCs the mappings claim.
+ * The routing facts as one POD block: which instrument a key plays, which tracks it may take, what
+ * each instrument bakes into a note, and which CCs the mappings claim.
  *
  * ⚠️ **THIS IS THE ONLY VIEW OF THE PROJECT THE DRAIN EVER SEES.** The project holds strings and
  * vectors the UI thread reallocates; this is built from it on the UI thread (`build_midi_route`) and
@@ -377,10 +378,9 @@ struct MidiRouteInstrument {
  * old. Anything a future routing rule needs goes in HERE, not in a pointer to the project.
  */
 struct MidiRoute {
-    int8_t   channel[POOL_TRACKS];         // the track's IN CH; -1 = not listening
-    int16_t  rowInstrument[POOL_TRACKS];   // the IN INS row; -1 = unset
-    int16_t  learned[POOL_TRACKS];         // what the sequencer last played on the track; -1 = nothing yet
-    int16_t  fallback;                     // the instrument the UI is showing; -1 = none
+    int16_t  instrument;                   // what a key plays: the instrument the UI is on; -1 = none
+    int8_t   baseTrack;                    // the track the SONG cursor is on — the first voice
+    int8_t   voices;                       // 1 = MONO, 2..8 = POLY: tracks baseTrack.. baseTrack+voices-1
     int16_t  instrumentCount;              // ids at or past this resolve to nothing
     int8_t   controlChannel;               // the CTL CH row: 0-15, MIDI_CTL_CH_ALL, or -1 for none
     uint8_t  learnArmed;                   // R is held: a knob on the control channel names, never drives
@@ -398,18 +398,14 @@ struct MidiRoute {
  * `claimed` is the set of controllers `apply_mapped_cc` would drive right now — same predicate, so a
  * CC the drain hands to the mappings is one the mappings will take. A destination that has gone
  * (the instrument slot cleared, the track out of range) is not claimed, and its knob falls through to
- * the track exactly as it did before the mapping existed.
+ * the tracks exactly as it did before the mapping existed.
  */
-inline MidiRoute build_midi_route(const Project& p, const TrackInstruments& learned, int fallback,
+inline MidiRoute build_midi_route(const Project& p, int instrument, int baseTrack, int voices,
                                   int controlChannel, bool learnArmed) {
     MidiRoute r{};
-    for (int t = 0; t < POOL_TRACKS; ++t) {
-        const size_t i = static_cast<size_t>(t);
-        r.channel[t]       = i < p.midiInputChannels.size()    ? static_cast<int8_t>(p.midiInputChannels[i])     : -1;
-        r.rowInstrument[t] = i < p.midiInputInstruments.size() ? static_cast<int16_t>(p.midiInputInstruments[i]) : -1;
-        r.learned[t]       = learned.current(static_cast<uint8_t>(t));
-    }
-    r.fallback        = static_cast<int16_t>(fallback);
+    r.instrument      = static_cast<int16_t>(instrument);
+    r.baseTrack       = static_cast<int8_t>(baseTrack < 0 ? 0 : (baseTrack >= POOL_TRACKS ? POOL_TRACKS - 1 : baseTrack));
+    r.voices          = static_cast<int8_t>(voices < 1 ? 1 : (voices > POOL_TRACKS ? POOL_TRACKS : voices));
     r.instrumentCount = static_cast<int16_t>(p.instruments.size() < static_cast<size_t>(POOL_INSTRUMENTS)
                                                  ? p.instruments.size() : static_cast<size_t>(POOL_INSTRUMENTS));
     r.controlChannel  = static_cast<int8_t>(controlChannel);
@@ -431,45 +427,27 @@ inline MidiRoute build_midi_route(const Project& p, const TrackInstruments& lear
 /** The route, published by the UI thread and copied out by the drain without waiting. */
 using MidiRoutePublisher = SeqPublisher<MidiRoute>;
 
-// ─── The router — channel to track, track to instrument, message to bus record ──────────────────
+// ─── The router — a key to a track, a message to bus records ─────────────────────────────────────
 
 /**
- * Turns a parsed message into the bus records it means, for whichever tracks are listening.
+ * Turns a parsed message into the bus records it means. Every channel is heard.
  *
- * ⚠️ **THE INSTRUMENT IS NOT IN THE MAP, AND THAT IS THE RATIFIED DATA MODEL** (§7): a track's input
- * entry is a CHANNEL and nothing else, so "which instrument does this key play?" has to be answered
- * from somewhere. The route answers it in the order the IN INS row, then *the track's current
- * instrument* — `TrackInstruments`, the SAME object both bus consumers use to decide who owns a
- * track-scoped event, copied into the route by the UI thread — then the instrument the UI is showing.
+ * A key plays the instrument the UI is on, on the track the SONG cursor is on — both remembered when
+ * the user leaves those screens, so a keyboard keeps playing from anywhere. A tracker track is one
+ * voice, so a chord needs several: the window is `voices` tracks starting at the cursor's, clipped at
+ * the last track, and never reaching left of the cursor.
  *
- * ⚠️ **With a fallback, and the fallback is what makes the feature work at all on the first try.**
- * `TrackInstruments` learns from note-ons, so on a stopped song — or a track that has not played yet —
- * it knows nothing, and a keyboard would be silent with everything correctly configured. That is the
- * failure mode §B2 wrote down the hard way: *a feature whose "not configured" state is
- * indistinguishable from its "broken" state will be reported as broken.* So the host supplies the
- * instrument the UI is currently showing — the same one the A-button preview auditions — and a live key
- * plays what you are looking at until the sequencer says otherwise.
+ * ⚠️ **EACH NOTE TAKES THE LOWEST-NUMBERED FREE TRACK IN THE WINDOW**, not the one idle longest: a
+ * chord then uses as few tracks as it can, which is what recording it would want. The price is that a
+ * track just let go of can be retaken while its release is still ringing. With every track held, the
+ * oldest note is stolen. MONO is simply a window of one.
  *
- * Fan-out is real: several tracks may name the same input channel, so one message can produce up to
- * `POOL_TRACKS` records.
+ * ⚠️ **NOTE-OFF FOLLOWS THE KEY**, searched over every track: the cursor may have moved since the key
+ * went down, and a release that looked only in the new window would leave the note hanging. A release
+ * for a key that was stolen finds no owner and is dropped — the note it would have ended is over.
  *
- * ⚠️⚠️ **A CHORD IS SHARED BETWEEN TRACKS THAT PLAY THE SAME INSTRUMENT, AND COPIED TO TRACKS THAT DO
- * NOT.** A tracker track is one voice, so eight tracks listening to one channel used to play the same
- * key eight times over — unison, not a chord. Now the listening tracks are grouped by the instrument
- * they resolve to: each note-on takes ONE track out of its group (the one idle longest; if all are
- * holding a key, the oldest of them is stolen), and each group gets its own copy of the note. So
- * eight tracks with one instrument is an eight-voice piano, four plus four is a two-voice layer of two
- * sounds, and one track alone is exactly what it always was. The grouping is DERIVED from the
- * instrument row — there is no mode to set, and nothing to get wrong except which instrument a track
- * plays, which is the thing the screen already shows.
- *
- * ⚠️ **NOTE-OFF FOLLOWS THE KEY, NOT THE CHANNEL**: the track a key was handed to is remembered, and
- * its release is the only one that goes out. A release for a key that was stolen finds no owner and
- * is dropped — the note it would have ended is already over.
- *
- * ⚠️ Everything that is NOT a note — CC, program change, pitch bend — still reaches EVERY listening
- * track. Those are channel-wide on the wire and a mod wheel that moved only one voice of a chord
- * would be a bug on any synth.
+ * ⚠️ CC, program change and pitch bend reach every track in the window: they are channel-wide on the
+ * wire, and a mod wheel that moved one voice of a chord would be a bug on any synth.
  *
  * ⚠️ Runs on the drain's thread. The counters are atomics because the MIDI screen reads them from
  * the UI thread; everything else here is the drain's alone.
@@ -498,73 +476,37 @@ class MidiInputRouter {
         if (!msg.is_channel()) { bump(nonChannel_); return 0; }
 
         int n = 0;
-        bool anyTrack = false;
 
         // ⚠️ THE NOTE-OFF ARM COMES FIRST, for the reason `build` states: a note-on at velocity 0 IS a
         // note-off, and it has to find the track holding that key rather than take a new one.
         if (msg.is_note_off()) {
             for (int t = 0; t < POOL_TRACKS && n < maxOut; ++t) {
-                if (!listens(t, msg.channel)) continue;
-                anyTrack = true;
-                if (held_[t] != static_cast<int>(msg.data1)) continue;
+                if (held_[t] != static_cast<int>(msg.data1) || heldCh_[t] != msg.channel) continue;
                 held_[t] = -1;
-                // ⚠️ STAMPED ON THE WAY OUT AS WELL AS THE WAY IN, and that is the whole of "idle
-                // longest": a track stamped only when it TOOK a key would look older the more
-                // recently it let one go, so the next note would land on the tail still ringing.
-                idle_[t] = ++clock_;
                 if (build(msg, frame, static_cast<uint8_t>(t), INSTRUMENT_NONE, out[n])) { ++n; bump(routed_); }
             }
-            if (!anyTrack) bump(unmapped_);
             return n;
         }
+
+        const int instrument = play_instrument();
+        if (instrument < 0) { bump(noInstrument_); return 0; }
 
         if (msg.is_note_on()) {
-            // One note per INSTRUMENT among the listening tracks. `served` is the instruments this
-            // message has already been given to, so the second track of a group is skipped rather
-            // than handed a second copy.
-            int served[POOL_TRACKS];
-            int servedCount = 0;
-            for (int t = 0; t < POOL_TRACKS && n < maxOut; ++t) {
-                if (!listens(t, msg.channel)) continue;
-                anyTrack = true;
-
-                const int instrument = input_instrument(t);
-                if (instrument < 0) { bump(noInstrument_); continue; }
-
-                bool already = false;
-                for (int i = 0; i < servedCount; ++i) already = already || (served[i] == instrument);
-                if (already) continue;
-                served[servedCount++] = instrument;
-
-                const int target = take_track(msg.channel, instrument);
-                if (target < 0) continue;   // cannot happen: `t` itself is a candidate
-                held_[target]    = static_cast<int>(msg.data1);
-                heldIns_[target] = static_cast<int16_t>(instrument);
-                idle_[target]    = ++clock_;
-                if (build(msg, frame, static_cast<uint8_t>(target), instrument, out[n])) { ++n; bump(routed_); }
-                else                                                                     bump(unsupported_);
-            }
-            if (!anyTrack) bump(unmapped_);
+            const int target = take_track();
+            held_[target]    = static_cast<int>(msg.data1);
+            heldCh_[target]  = msg.channel;
+            heldIns_[target] = static_cast<int16_t>(instrument);
+            taken_[target]   = ++clock_;
+            if (build(msg, frame, static_cast<uint8_t>(target), instrument, out[n])) { ++n; bump(routed_); }
+            else                                                                     bump(unsupported_);
             return n;
         }
 
-        // CC, program change, pitch bend: channel-wide, so every listening track gets one.
-        for (int t = 0; t < POOL_TRACKS && n < maxOut; ++t) {
-            if (!listens(t, msg.channel)) continue;
-            anyTrack = true;
-
-            const int instrument = input_instrument(t);
-            if (instrument < 0) { bump(noInstrument_); continue; }
-
-            if (build(msg, frame, static_cast<uint8_t>(t), instrument, out[n])) {
-                ++n;
-                bump(routed_);
-            } else {
-                bump(unsupported_);
-            }
+        // CC, program change, pitch bend: channel-wide, so every track in the window gets one.
+        for (int t = window_begin(); t < window_end() && n < maxOut; ++t) {
+            if (build(msg, frame, static_cast<uint8_t>(t), instrument, out[n])) { ++n; bump(routed_); }
+            else                                                               bump(unsupported_);
         }
-
-        if (!anyTrack) bump(unmapped_);
         return n;
     }
 
@@ -575,73 +517,55 @@ class MidiInputRouter {
      * allocator goes on believing tracks are busy and starts stealing from the first note.
      */
     void release_all_keys() {
-        for (int t = 0; t < POOL_TRACKS; ++t) { held_[t] = -1; heldIns_[t] = INSTRUMENT_NONE; }
+        for (int t = 0; t < POOL_TRACKS; ++t) { held_[t] = -1; heldCh_[t] = 0; heldIns_[t] = INSTRUMENT_NONE; }
     }
 
     /** The instrument a track-scoped record on `track` is for: the key it holds, else what a key
-     *  would resolve to now. `INSTRUMENT_NONE` when nothing answers. */
+     *  would play now. `INSTRUMENT_NONE` when nothing answers. */
     int16_t instrument_of(uint8_t track) const {
         if (track >= POOL_TRACKS) return INSTRUMENT_NONE;
         if (held_[track] >= 0 && heldIns_[track] >= 0) return heldIns_[track];
-        const int id = input_instrument(track);
+        const int id = play_instrument();
         return id < 0 ? INSTRUMENT_NONE : static_cast<int16_t>(id);
     }
 
     // ── counters: every path that produces no event says which one it was ────────────────────────
-    // ⭐ A component whose correct behaviour is silence cannot be told from one that never ran. Four
-    // separate reasons, because "nothing happened" has four completely different fixes: turn on SYNC
-    // (nonChannel), map a track (unmapped), pick an instrument (noInstrument), or nothing at all
-    // (unsupported — aftertouch, which this engine has no form for).
+    // ⭐ A component whose correct behaviour is silence cannot be told from one that never ran. Three
+    // separate reasons, because "nothing happened" has different fixes: turn on SYNC (nonChannel),
+    // pick an instrument (noInstrument), or nothing at all (unsupported — aftertouch, which this
+    // engine has no form for).
     uint64_t routed() const { return routed_.load(std::memory_order_relaxed); }
     uint64_t nonChannel() const { return nonChannel_.load(std::memory_order_relaxed); }
-    uint64_t unmapped() const { return unmapped_.load(std::memory_order_relaxed); }
     uint64_t noInstrument() const { return noInstrument_.load(std::memory_order_relaxed); }
     uint64_t unsupported() const { return unsupported_.load(std::memory_order_relaxed); }
 
     void reset_counters() {
-        for (std::atomic<uint64_t>* c : {&routed_, &nonChannel_, &unmapped_, &noInstrument_, &unsupported_})
+        for (std::atomic<uint64_t>* c : {&routed_, &nonChannel_, &noInstrument_, &unsupported_})
             c->store(0, std::memory_order_relaxed);
     }
 
   private:
     static void bump(std::atomic<uint64_t>& c) { c.fetch_add(1, std::memory_order_relaxed); }
 
-    /** Does track `t` listen to this channel at all? */
-    bool listens(int t, uint8_t channel) const {
-        return route_->channel[t] == static_cast<int8_t>(channel);
+    int play_instrument() const {
+        const int id = route_->instrument;
+        return (id < 0 || id >= route_->instrumentCount) ? -1 : id;
     }
 
-    /**
-     * The instrument track `t`'s incoming events play, or −1 for "nothing to play them on".
-     *
-     * ⚠️ **THE ROW WINS WHERE IT IS SET**, and where it is not the old rule stands: the instrument the
-     * track last played, then the one the INSTRUMENT screen is showing. The fallback is what makes a
-     * keyboard work before anything is configured; the row is what makes the answer sayable out loud.
-     */
-    int input_instrument(int t) const {
-        int id = route_->rowInstrument[t];
-        if (id < 0) id = route_->learned[t];
-        if (id < 0) id = route_->fallback;
-        if (id < 0 || id >= route_->instrumentCount) return -1;
-        return id;
+    int window_begin() const { return route_->baseTrack; }
+    int window_end() const {
+        const int end = route_->baseTrack + route_->voices;
+        return end > POOL_TRACKS ? POOL_TRACKS : end;
     }
 
-    /**
-     * Which track of a group takes the next key: the one idle longest, else the oldest note in it.
-     *
-     * ⚠️ **LEAST RECENTLY USED, NOT "THE FIRST FREE ONE"** — a track that has just let a key go is
-     * still ringing its release, and handing it the next note of a run would cut every tail off. The
-     * counter is a plain sequence number stamped at both ends of a key's life: it never wraps in any
-     * session a person will play.
-     */
-    int take_track(uint8_t channel, int instrument) {
-        int free = -1, oldest = -1;
-        for (int t = 0; t < POOL_TRACKS; ++t) {
-            if (!listens(t, channel) || input_instrument(t) != instrument) continue;
-            if (held_[t] < 0) { if (free   < 0 || idle_[t] < idle_[free])   free   = t; }
-            else              { if (oldest < 0 || idle_[t] < idle_[oldest]) oldest = t; }
+    /** The lowest free track in the window, else the one holding the oldest key. */
+    int take_track() const {
+        int oldest = -1;
+        for (int t = window_begin(); t < window_end(); ++t) {
+            if (held_[t] < 0) return t;
+            if (oldest < 0 || taken_[t] < taken_[oldest]) oldest = t;
         }
-        return free >= 0 ? free : oldest;
+        return oldest;
     }
 
     /** Fill one record. False = this message has no bus form (aftertouch), so nothing is written. */
@@ -727,16 +651,16 @@ class MidiInputRouter {
 
     const MidiRoute* route_ = nullptr;
 
-    // The allocator's whole state: which key each track is holding (−1 = none), which instrument it
-    // took it for, and when it last took one. ⚠️ Per TRACK and not per group — a track's group can
-    // change under it (the row is editable while a key is down), and a key that is being held has to
-    // be releasable whatever the screen says afterwards.
+    // The allocator's whole state: which key each track is holding (−1 = none), on which channel,
+    // which instrument it took it for, and when. ⚠️ Per TRACK: the window and the instrument can
+    // change while a key is down, and a held key has to be releasable whatever the screen says.
     int      held_[POOL_TRACKS];
+    uint8_t  heldCh_[POOL_TRACKS];
     int16_t  heldIns_[POOL_TRACKS];
-    uint64_t idle_[POOL_TRACKS] = {};
-    uint64_t clock_             = 0;
+    uint64_t taken_[POOL_TRACKS] = {};
+    uint64_t clock_              = 0;
 
-    std::atomic<uint64_t> routed_{0}, nonChannel_{0}, unmapped_{0}, noInstrument_{0}, unsupported_{0};
+    std::atomic<uint64_t> routed_{0}, nonChannel_{0}, noInstrument_{0}, unsupported_{0};
 };
 
 // ─── What the drain saw, carried back to the UI thread ───────────────────────────────────────────

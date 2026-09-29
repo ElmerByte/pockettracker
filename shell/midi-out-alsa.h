@@ -10,6 +10,7 @@
 
 #if defined(__linux__) && !defined(__ANDROID__)
 
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,7 @@ class AlsaMidiOut : public MidiOutBase {
     void        close() override;
     bool        is_open() const override { return out_ != nullptr; }
     void        send(const uint8_t* data, int len) override;
+    bool        broken() const override { return broken_.load(std::memory_order_relaxed); }
 
     /**
      * False when libasound.so.2 is absent or a symbol is missing — MIDI is then simply unavailable
@@ -44,6 +46,7 @@ class AlsaMidiOut : public MidiOutBase {
     alsa_detail::AlsaApi                       a_{};
     std::vector<alsa_detail::RawmidiDevice>    devices_;
     void*                                      out_ = nullptr;   // snd_rawmidi_t*
+    std::atomic<bool>                          broken_{false};   // set on the sender thread
 };
 
 }  // namespace ptshell

@@ -28,6 +28,7 @@ class AlsaMidiIn : public MidiInBase {
     bool        open(int index) override;
     void        close() override;
     bool        is_open() const override { return in_ != nullptr; }
+    bool        broken() const override { return dead_.load(std::memory_order_relaxed); }
 
     /** False when libasound.so.2 is absent or a symbol is missing — the INPUT row then draws NO PORTS. */
     bool available() const { return lib_ != nullptr; }

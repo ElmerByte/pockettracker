@@ -163,8 +163,8 @@ void AlsaMidiIn::reader() {
         readErrors_.fetch_add(1, std::memory_order_relaxed);
         note_port_error();
         dead_.store(true, std::memory_order_relaxed);
-        std::printf("midi in: read failed (%s) - the input port has stopped; re-pick it on the MIDI "
-                    "screen to resume\n",
+        std::printf("midi in: read failed (%s) - the input port has stopped; it reopens by itself when "
+                    "the device is back\n",
                     a_.strerror_fn(static_cast<int>(n)));
         std::fflush(stdout);
         return;

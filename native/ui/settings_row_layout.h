@@ -410,62 +410,29 @@ inline int project_row_offset_y(ProjectRow target, const PlatformCaps& caps, int
 // every platform — a MIDI cable is not a device capability the way a touchscreen is, and a phone with
 // no port simply enumerates none, which OUTPUT already has a word for.
 //
-// ⚠️ **SYNC OUT WAS DELIBERATELY ABSENT UNTIL PHASE C, AND `INPUT` / `IN CH` UNTIL PHASE E3**, though
-// `Project::midiSyncOut` and `Project::midiInputChannels` have round-tripped since B1. A row that
-// stores a choice nobody reads is the exact trap the guardrails name: a setting that round-trips is not
-// a setting that is applied. Each got its row in the increment that got its reader. `SYNC IN` is still
-// absent for that reason (§9 defers it) — the two-column sketch in §8.1 is one column here because the
-// rows its right-hand column held are these, arriving one phase at a time.
+// SYNC IN is absent: nothing reads it yet (§9 defers it), and a row that stores a choice nobody
+// reads is a setting that round-trips without being applied.
 enum class MidiRow {
-    OUTPUT   = 0,   // <device name> | OFF   — the cable
-    INPUT    = 1,   // <device name> | OFF   — the cable      (phase E3)
+    OUTPUT   = 0,   // <device name> | AUTO | OFF — the cable
+    INPUT    = 1,   // <device name> | AUTO | OFF — the cable
     OFFSET   = 2,   // -99..+99 MS           — the cable
-    SYNC     = 3,   // ON | OFF              — the cable (phase C: 24 PPQN clock + transport)
-    CTL_CH   = 4,   // -- | 01..16           — the cable: which channel carries MAPPING knobs
-    PROG_CHG = 5,   // ON | OFF              — the project (Instrument BANK/PROG on note-on)
-    IN_MAP   = 6,   // 8 cells, -- | 01..16  — the project (per-track input channel, phase E3)
-    // ⚠️ DIRECTLY UNDER THE CHANNEL ROW AND SHARING ITS HEADER, because the two cells above each
-    // other are one answer: track 3 listens to channel 1 and plays instrument 0C. Apart they are two
-    // eight-cell rows nobody can line up by eye.
-    IN_INS   = 7,   // 8 cells, -- | 00..7F  — the project (per-track input instrument)
-    // ⚠️ THE FIRST ROW ON THIS SCREEN THAT IS A DOOR RATHER THAN A VALUE. It sits with the two
-    // actions below it rather than in the settings/song halves above, because what A does on it is
-    // its whole content — the same shape PROJECT's SYSTEM and MIDI rows have.
-    MAPPING  = 8,   // A: the mapping list   — the project (phase 3)
-    PANIC    = 9,   // A: ALL NOTES OFF
-    TEST     = 10,  // A: C-4 CH 1
+    SYNC     = 3,   // ON | OFF              — the cable (24 PPQN clock + transport)
+    CTL_CH   = 4,   // ALL | 01..16          — the cable: which channel carries MAPPING knobs
+    KEYS     = 5,   // MONO | POLY 2..8      — how a live key plays (settings.json)
+    PROG_CHG = 6,   // ON | OFF              — the project (Instrument BANK/PROG on note-on)
+    MAPPING  = 7,   // A: the mapping list   — the project
+    PANIC    = 8,   // A: ALL NOTES OFF
+    TEST     = 9,   // A: C-4 CH 1
 };
 
-// ⚠️ ROWS ARE INSERTED HERE, NOT APPENDED, and unlike B4.3's PROJECT row that is safe: nothing in the
-// tree stores a MIDI row index. `settings.json` and the `.ptp` both key rows by NAME, `ptdispatch`
-// drives them by enumerator, `p3-input.txt` has no MIDI line at all (the screen has no Kotlin twin),
-// and the cursor is clamped to `MIDI_ROW_COUNT` on every move. What decided each position is the
-// grouping: OUTPUT/INPUT/OFFSET/SYNC describe THIS MACHINE'S CABLE and live in settings.json, PROG CHG
-// and IN CH describe THE SONG and travel in the .ptp, and the last two are actions. INPUT sits beside
-// OUTPUT rather than after SYNC because the question a user arrives with is "which cables am I on".
-// CTL CH ends the cable group because it is the row IN CH below it must be read against: the two
-// divide the incoming channels between them, one for knobs and the rest for keys.
-constexpr int MIDI_ROW_COUNT = 11;
+// ⚠️ ROWS MAY BE INSERTED AND REMOVED HERE, unlike PROJECT's: nothing in the tree stores a MIDI row
+// index. `settings.json` and the `.ptp` key rows by NAME, `ptdispatch` drives them by enumerator,
+// `p3-input.txt` has no MIDI line at all, and the cursor is clamped to `MIDI_ROW_COUNT` on every move.
+// The order is the grouping: the cable and the keyboard (settings.json), then the song, then actions.
+constexpr int MIDI_ROW_COUNT = 10;
 
-/** The two map rows are eight cells wide — one per track — and they are cursor COLUMNS 1..8. */
-constexpr int MIDI_IN_MAP_COLUMNS = 8;
-
-/**
- * The per-track rows: eight cells under one header, and the cursor CARRIES its column between them.
- * Derived rather than listed at each site — the column rule, the header and the gap all ask it.
- */
-inline bool midi_row_is_track_map(MidiRow row) {
-    return row == MidiRow::IN_MAP || row == MidiRow::IN_INS;
-}
-
-/**
- * Group gaps: after PROG CHG (the single-value rows end and the track map begins — the blank row is
- * also where the map's `1 2 3 4 5 6 7 8` header is drawn) and after the map (the values end, the two
- * actions begin). ⚠️ NOT between the two map rows: they share the header above them.
- */
-inline bool midi_row_gap_after(MidiRow row) {
-    return row == MidiRow::PROG_CHG || row == MidiRow::IN_INS;
-}
+/** One blank row after PROG CHG: the values end, the actions begin. */
+inline bool midi_row_gap_after(MidiRow row) { return row == MidiRow::PROG_CHG; }
 
 /** How far down the panel a MIDI row is drawn, in pixels from the first row's top. */
 inline int midi_row_offset_y(MidiRow target, int rowHeight) {

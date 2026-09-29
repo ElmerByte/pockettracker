@@ -74,7 +74,7 @@ void MidiMapModule::draw(Canvas& c, int x, int y, const MidiMapState& s) const {
                 FONT_SCALE);
 
     // The column headers. They are what makes six anonymous numbers a table, and they carry the
-    // cursor mark for the column it is in — the IN CH row's header does the same thing.
+    // cursor mark for the column it is in.
     const int headerY = y + TEXT_PADDING + ROW_HEIGHT + 14;
     const int cursorCol = s.cursorColumn;
     const auto header = [&](const char* text, int column, MapCol lo, MapCol hi) {

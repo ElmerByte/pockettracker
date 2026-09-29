@@ -41,6 +41,16 @@ std::string WinmmMidiOut::device_name(int index) {
     return std::string(caps.szPname);
 }
 
+// "Microsoft GS Wavetable Synth" is present on every Windows machine; without this AUTO would take it
+// at launch and never move to the device the user plugs in.
+bool WinmmMidiOut::is_builtin_synth(int index) {
+    MIDIOUTCAPSA caps{};
+    if (index < 0 || index >= device_count()) return false;
+    if (::midiOutGetDevCapsA(static_cast<UINT_PTR>(index), &caps, sizeof caps) != MMSYSERR_NOERROR)
+        return false;
+    return caps.wTechnology == MOD_SWSYNTH;
+}
+
 bool WinmmMidiOut::open(int index) {
     close();
     if (index < 0 || index >= device_count()) return false;

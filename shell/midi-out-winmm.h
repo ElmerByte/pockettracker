@@ -37,6 +37,7 @@ class WinmmMidiOut : public MidiOutBase {
     void        close() override;
     bool        is_open() const override { return handle_ != nullptr; }
     void        send(const uint8_t* data, int len) override;
+    bool        is_builtin_synth(int index) override;
 
   private:
     HMIDIOUT handle_ = nullptr;

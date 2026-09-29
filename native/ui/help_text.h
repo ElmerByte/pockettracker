@@ -275,12 +275,11 @@ enum class HelpTopic {
     MIDI_OFFSET,
     MIDI_SYNC,
     MIDI_PROG_CHG,
-    MIDI_IN_CHANNEL,
+    MIDI_KEYS,
     MIDI_PANIC,
     MIDI_TEST,
     MIDI_CTL_CH,
     MIDI_MAPPING,
-    MIDI_IN_INSTRUMENT,
 
     // MIDI MAPPING — one topic per column of a mapping row, plus the row that adds one
     MAP_CC,
@@ -1583,14 +1582,17 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "the far device picks the right",
       "patch. Saved with the song."},
      {"A+D-PAD turns it on or off"}},
-    /* MIDI_IN_CHANNEL */
-    {"IN CH: what a track listens to", "One channel per track.", "-- ignores the input.",
-     {"The input channel each track",
-      "listens to, one cell per track.",
-      "-- does not listen."},
-     {"A+→ on -- turns it on",
-      "A+←/→ steps 1",
-      "A+B sets it back to --"}},
+    /* MIDI_KEYS */
+    {"KEYS: how a keyboard plays", "The selected instrument, on", "the track of the SONG cursor.",
+     {"A key plays the instrument you",
+      "last picked, on the track the",
+      "SONG cursor is on - from any",
+      "screen.",
+      "MONO: that track, one note.",
+      "POLY 2-8: a chord takes that",
+      "many tracks from the cursor",
+      "rightwards, lowest free first."},
+     {"A+←/→ steps MONO, POLY 2..8"}},
     /* MIDI_PANIC */
     {"PANIC: silence everything", "A sends all notes off on", "every channel.",
      {"Sends note off on every channel",
@@ -1625,19 +1627,6 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "and turn a knob. Needs a device",
       "on the INPUT row."},
      {"A opens the list"}},
-    /* MIDI_IN_INSTRUMENT */
-    {"INS: what the keys play", "One instrument per track.", "-- plays what the track plays.",
-     {"The instrument each track plays",
-      "a live key on. -- follows what",
-      "the track itself plays.",
-      "",
-      "Tracks sharing a channel AND an",
-      "instrument share a chord, one",
-      "note each: set four the same",
-      "for four-note chords."},
-     {"A+→ on -- picks 00",
-      "A+←/→ steps 1",
-      "A+B sets it back to --"}},
 
     // ── The MIDI mapping list ────────────────────────────────────────────────────────────────────
     /* MAP_CC */
@@ -2626,7 +2615,7 @@ inline HelpTopic settings_cell_topic(int row, int column) {
     return HelpTopic::NONE;
 }
 
-/** MIDI — one topic per row. IN CH is eight cells that all mean the same thing, one per track. */
+/** MIDI — one topic per row. */
 inline HelpTopic midi_cell_topic(int row) {
     if (row < 0 || row >= MIDI_ROW_COUNT) return HelpTopic::NONE;
     switch (static_cast<MidiRow>(row)) {
@@ -2635,9 +2624,8 @@ inline HelpTopic midi_cell_topic(int row) {
         case MidiRow::OFFSET:   return HelpTopic::MIDI_OFFSET;
         case MidiRow::SYNC:     return HelpTopic::MIDI_SYNC;
         case MidiRow::CTL_CH:   return HelpTopic::MIDI_CTL_CH;
+        case MidiRow::KEYS:     return HelpTopic::MIDI_KEYS;
         case MidiRow::PROG_CHG: return HelpTopic::MIDI_PROG_CHG;
-        case MidiRow::IN_MAP:   return HelpTopic::MIDI_IN_CHANNEL;
-        case MidiRow::IN_INS:   return HelpTopic::MIDI_IN_INSTRUMENT;
         case MidiRow::MAPPING:  return HelpTopic::MIDI_MAPPING;
         case MidiRow::PANIC:    return HelpTopic::MIDI_PANIC;
         case MidiRow::TEST:     return HelpTopic::MIDI_TEST;

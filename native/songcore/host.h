@@ -158,7 +158,13 @@ class SongcoreHost {
      * Pushed every frame by the shell, because the user moves the cursor between frames; it reaches
      * the drain with the next route the poll publishes.
      */
-    void set_midi_in_instrument(int instrumentId) { midiInFallback_ = instrumentId; }
+    /** What a live key plays: `instrument` on `track` (the SONG cursor's), over `voices` tracks
+     *  (1 = MONO). Published to the drain by the next poll, and only when it changed. */
+    void set_midi_in_play(int instrument, int track, int voices) {
+        midiInInstrument_ = instrument;
+        midiInTrack_      = track;
+        midiInVoices_     = voices;
+    }
 
     /**
      * MIDI THRU — whether a live key on a track whose instrument is EXTERNAL reaches the CABLE.
@@ -1610,14 +1616,14 @@ class SongcoreHost {
      * Give the audio thread's drain what it routes against and what it plays: the route snapshot, and
      * every table and program the engine does not yet hold.
      *
-     * The route is rebuilt each poll and published only when it differs — a cursor move, a channel
-     * cell, a note the sequencer played, a mapping added — so the drain sees an edit within one poll
+     * The route is rebuilt each poll and published only when it differs — a cursor move, another
+     * instrument, a mapping added — so the drain sees an edit within one poll
      * and pays nothing when nothing changed. ⚠️ The tables are pushed EAGERLY here because the note
      * path's own lazy push (`plan_note_on`) never runs for a live key: a value pushed by its only
      * reader is stale the moment a second reader appears.
      */
     void arm_midi_in() {
-        const MidiRoute route = build_midi_route(project_, external_.track_instruments(), midiInFallback_,
+        const MidiRoute route = build_midi_route(project_, midiInInstrument_, midiInTrack_, midiInVoices_,
                                                  controlChannel_, learnArmed_);
         if (!midiRoutePublished_ || std::memcmp(&route, &midiRouteLast_, sizeof route) != 0) {
             midiIn_.publish_route(route);
@@ -1762,7 +1768,9 @@ class SongcoreHost {
     MidiRoute         midiRouteLast_{};           // the route as last published, to publish only a change
     bool              midiRoutePublished_ = false;
     Routing           programRouting_;            // per INSTRUMENT id: the slot and ratio its program last carried
-    int               midiInFallback_     = -1;   // the instrument the UI is showing
+    int               midiInInstrument_   = -1;   // the instrument the UI is on
+    int               midiInTrack_        = 0;    // the SONG cursor's track
+    int               midiInVoices_       = 1;    // 1 = MONO
     IMidiInObserver*  midiInObserver_     = nullptr;
     // `midiInThru_` defaults to the FEATURE — see set_midi_in_thru.
     bool              midiInThru_ = true;

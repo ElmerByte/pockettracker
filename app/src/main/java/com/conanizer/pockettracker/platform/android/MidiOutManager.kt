@@ -67,12 +67,18 @@ class MidiOutManager(context: Context) {
      */
     private val scratch = ByteArray(3)
 
+    private var warnedNoManager = false
+
     /** How many devices we can SEND to. Re-enumerates: MIDI is hot-pluggable. */
     fun deviceCount(): Int {
         val m = manager
         if (m == null) {
             devices = emptyList()
-            Log.w(TAG, "no MidiManager on this device (no FEATURE_MIDI) - MIDI out unavailable")
+            // Once: the list is rescanned every second.
+            if (!warnedNoManager) {
+                warnedNoManager = true
+                Log.w(TAG, "no MidiManager on this device (no FEATURE_MIDI) - MIDI out unavailable")
+            }
             return 0
         }
         // ⚠️ `inputPortCount > 0`, not output — see the class note. Sorted by id so the order is

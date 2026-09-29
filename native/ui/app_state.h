@@ -148,7 +148,7 @@ struct AppState {
     int projectCursorRow    = 0;
     int projectCursorColumn = 1;
 
-    // MIDI (B4.3). One column but for IN CH — ui/modules/midi_settings.h.
+    // MIDI (B4.3). One column — ui/modules/midi_settings.h.
     int midiCursorRow    = 0;
     int midiCursorColumn = 1;
 
@@ -359,14 +359,16 @@ struct AppState {
     songcore::IMidiOut* midiOut = nullptr;
 
     /**
-     * The enumerated port list with "OFF" prepended, and the index into it that is currently OPEN.
+     * The enumerated port list with "OFF" and "AUTO" prepended, and the index of the current choice.
      *
      * ⚠️ REBUILT ON EVERY ENTRY TO THE SCREEN, not once at boot — `refresh_midi_devices()`. MIDI is
      * hot-pluggable and a device list is stale the moment a cable moves; the screen that exists to pick
      * one is the exact place where a stale list is a bug the user cannot explain.
      */
-    std::vector<std::string> midiDeviceNames{"OFF"};
+    std::vector<std::string> midiDeviceNames{"OFF", "AUTO"};
     int                      midiDeviceIndex = 0;
+    /** The device actually open, "" for none. Under AUTO it is not the setting, so it is kept here. */
+    std::string              midiOutOpenName;
 
     /**
      * The INPUT port and its own list (phase E2) — the mirror of the two above, and separate from them
@@ -380,8 +382,9 @@ struct AppState {
      * dispatcher, and it reads this struct.
      */
     songcore::IMidiIn*       midiIn = nullptr;
-    std::vector<std::string> midiInDeviceNames{"OFF"};
+    std::vector<std::string> midiInDeviceNames{"OFF", "AUTO"};
     int                      midiInDeviceIndex = 0;
+    std::string              midiInOpenName;
 
     /** The MIDI screen's one-shot readout — "PANIC SENT", "TEST SENT", "NO PORT". */
     std::string midiStatusText;

@@ -165,10 +165,13 @@ struct SettingsValues {
     // ⚠️ THE DEVICE IS THE NAME STRING, NEVER AN INDEX — the same rule `portraitSkin` and `overlayName`
     // above already follow, and MIDI is the case that rule was WRITTEN for: a port list is rebuilt from
     // the OS on every enumeration and reorders itself whenever anything is plugged or unplugged, so an
-    // index saved on Tuesday names a different synth on Wednesday. "OFF" is the no-device choice.
-    std::string midiOutDevice = "OFF";
+    // index saved on Tuesday names a different synth on Wednesday. "OFF" is the no-device choice;
+    // "AUTO" takes the first device plugged in.
+    // ⚠️ The default reaches only a NEW install: settings.json stores this key, so an existing "OFF"
+    // stays OFF.
+    std::string midiOutDevice = "AUTO";
 
-    // The INPUT port (phase E2) — same kind, same rule, same "OFF" for no device. ⚠️ It is a NAME here
+    // The INPUT port (phase E2) — same kind, same rule, same "OFF" and "AUTO". ⚠️ It is a NAME here
     // too, and the input list is the one MORE likely to reorder: a USB keyboard is unplugged between
     // sessions where a desk synth is not.
     //
@@ -177,7 +180,7 @@ struct SettingsValues {
     // desk loopback survive a restart; what E3 adds is a way to change it without editing settings.json.
     // The alternative — the shell opening an input port privately until the row exists — is the "two
     // owners of which port is open" bug B4.3 already paid for once.
-    std::string midiInDevice = "OFF";
+    std::string midiInDevice = "AUTO";
 
     // Signed milliseconds; positive = MIDI leaves LATER than the audio. A message is released the
     // moment its block of sound is handed to the DEVICE, so the cable always runs ahead of our own
@@ -226,6 +229,9 @@ struct SettingsValues {
     // first knob a user maps works without their having to know the channel it sends on — which was
     // the whole cost of defaulting this to OFF.
     int         midiControlChannel = songcore::MIDI_CTL_CH_ALL;
+    // How a live key plays: 1 = MONO on the SONG cursor's track, 2..8 = POLY over that many tracks
+    // from it. The instrument is the one the UI is on.
+    int         midiInVoices = 4;
 
     // ⚠️ VISUALIZER is NOT here. It lives on the THEME (`Theme::visualizerType`), which is where
     // Kotlin keeps it too — and not by accident: the oscilloscope reads it off the theme it is already

@@ -80,6 +80,12 @@ struct IMidiOut {
     virtual bool is_open() const = 0;
 
     virtual void send(const uint8_t* data, int len) = 0;
+
+    /** True once the open port has failed in a way only a reopen can cure (the cable was pulled). */
+    virtual bool broken() const { return false; }
+
+    /** A synth built into the OS rather than a device someone plugged in — AUTO passes over it. */
+    virtual bool is_builtin_synth(int /*index*/) { return false; }
 };
 
 // ─── Scaling — the ONE place a wide internal value becomes a 7-bit one (plan §11) ────────────────

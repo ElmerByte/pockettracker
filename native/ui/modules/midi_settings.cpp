@@ -26,22 +26,6 @@ constexpr int VALUE_X = 156;   // the value column
 // costs, and it is accepted rather than solved: 20 characters is what there is.
 constexpr int VALUE_MAX_CHARS = (MidiModule::WIDTH - VALUE_X - NAME_X) / CHAR_W;
 
-// ─── The IN CH row's eight cells ─────────────────────────────────────────────────────────────────
-//
-// ⚠️ **THE PITCH IS 44px AND NOT A WHOLE NUMBER OF CHARACTERS, WHICH IS THE ONLY PLACE ON THIS SCREEN
-// THAT LEAVES THE TEXT GRID — and it is a layout constraint deciding a data question again (B4.2).**
-// A cell is two digits (34px with the trailing spacing dropped). Eight of them on the character grid
-// with a one-space gap is a pitch of 51, which puts the last cell's right edge at 156 + 7*51 + 32 =
-// 545 on a 510px panel: the map would not fit beside the other rows' value column, and the row would
-// have to start at the left margin and lose its label. 44 keeps it in the value column with every
-// other row, and 496 < 510 with room for the panel border.
-//
-// ⭐ **THE ALTERNATIVE WAS EIGHT ROWS, AND IT DOES NOT FIT EITHER**: `IN CH T1`…`T8` is 168px of extra
-// height on a 392px panel that is already 272 deep with the map as one row — it would push PANIC and
-// TEST off the bottom. §8.1's original sketch had it as one line for the same reason M8 does.
-constexpr int MAP_CELL_X     = VALUE_X;
-constexpr int MAP_CELL_PITCH = 44;
-
 int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 /**
@@ -58,50 +42,25 @@ std::string offset_text(int ms, bool automatic) {
 }
 
 /**
- * One device row's value: the name that is OPEN, or OFF plus how many ports there were.
+ * One device row's value: the name that is OPEN, or OFF/AUTO plus how many ports there were.
  *
  * ⭐ Shared by OUTPUT and INPUT, and it has to be: the whole point of the "OFF  02 PORTS" wording
  * (B4.3) is telling *"no device picked"* apart from *"this machine has none"*, and an INPUT row that
  * answered that question differently from OUTPUT would be the second, quieter half of the same
  * confusion. A machine can easily have two outputs and no inputs — this desk did, until loopMIDI.
  */
-std::string device_text(const std::vector<std::string>& names, int index) {
+std::string device_text(const std::vector<std::string>& names, int index, const std::string& open_name) {
     const int count = static_cast<int>(names.size());
     if (count == 0) return "OFF  NO PORTS";
 
-    const int idx     = clamp(index, 0, count - 1);
-    const int devices = count - 1;   // "OFF" is index 0 and is not a device
-    if (idx == 0) return devices > 0 ? "OFF  " + dec2(devices) + " PORTS" : "OFF  NO PORTS";
+    const int         idx     = clamp(index, 0, count - 1);
+    const int         devices = count > MIDI_FIRST_PORT ? count - MIDI_FIRST_PORT : 0;
+    const std::string ports   = devices > 0 ? dec2(devices) + " PORTS" : "NO PORTS";
+    if (idx == 0) return "OFF  " + ports;
+    if (idx == 1) return Canvas::clip_text(open_name.empty() ? "AUTO  " + ports : "AUTO " + open_name,
+                                           VALUE_MAX_CHARS);
 
     return Canvas::clip_text(names[static_cast<size_t>(idx)], VALUE_MAX_CHARS);
-}
-
-/**
- * One IN CH cell: `--` for off, else the channel numbered the way a musician's gear numbers it.
- *
- * ⚠️ **STORED 0-15, SHOWN 1-16** — the instrument screen's CHAN row makes exactly the same promise
- * (instrument_editor.cpp), and the two must not disagree: a keyboard set to "channel 1" and a track
- * showing `01` have to be the same number, or the map is a puzzle. The +1 lives in the DRAWING on both
- * screens and nowhere else; the context and the .ptp carry the wire number.
- */
-std::string map_cell_text(int channel) { return channel < 0 ? "--" : dec2(channel + 1); }
-
-/**
- * One IN INS cell: `--` for "whatever the track is playing", else the instrument in the base the
- * instrument screen shows it in.
- *
- * ⚠️ HEX, where the channel above it is DECIMAL, and the two sitting in one column is not an
- * inconsistency to iron out: a channel is a number on the back of a keyboard and is printed the way
- * that keyboard prints it; an instrument is a slot in this app and is printed the way every other
- * screen here prints it.
- */
-std::string map_instrument_text(int id) { return id < 0 ? "--" : hex2(id); }
-
-/** The stored instrument for a cursor COLUMN (1-based), or −1 for auto / a column naming no track. */
-int map_instrument_at(const songcore::Project& p, int column) {
-    const int track = column - 1;
-    if (track < 0 || track >= static_cast<int>(p.midiInputInstruments.size())) return -1;
-    return p.midiInputInstruments[static_cast<size_t>(track)];
 }
 
 /**
@@ -131,11 +90,9 @@ std::string ctl_ch_text(const MidiState& s) {
     return dec2(ch + 1) + "  MAPPED KNOBS";
 }
 
-/** The stored channel for a cursor COLUMN (1-based), or −1 for a column that names no track. */
-int map_channel_at(const songcore::Project& p, int column) {
-    const int track = column - 1;
-    if (track < 0 || track >= static_cast<int>(p.midiInputChannels.size())) return -1;
-    return p.midiInputChannels[static_cast<size_t>(track)];
+/** The KEYS row: one voice is MONO, more is POLY and how many tracks a chord may take. */
+std::string keys_text(int voices) {
+    return voices <= 1 ? "MONO  CURSOR TRACK" : "POLY " + std::to_string(voices) + "  FROM CURSOR";
 }
 
 /**
@@ -189,8 +146,8 @@ void MidiModule::draw(Canvas& c, int x, int y, const MidiState& s) const {
     // ask precisely WHEN the row reads OFF and you are trying to work out why; beside a named device it
     // is noise competing for the pixels that device's name needs. So the two states say different
     // things, and neither has to share a row with the other.
-    row_of(MidiRow::OUTPUT, "OUTPUT", device_text(s.deviceNames,   s.deviceIndex));
-    row_of(MidiRow::INPUT,  "INPUT",  device_text(s.inDeviceNames, s.inDeviceIndex));
+    row_of(MidiRow::OUTPUT, "OUTPUT", device_text(s.deviceNames,   s.deviceIndex,   s.outOpenName));
+    row_of(MidiRow::INPUT,  "INPUT",  device_text(s.inDeviceNames, s.inDeviceIndex, s.inOpenName));
 
     row_of(MidiRow::OFFSET,   "OFFSET",   offset_text(midi_offset_in_force(s.settings, s.autoOffsetMs),
                                                       s.settings.midiOffsetAuto));
@@ -198,66 +155,14 @@ void MidiModule::draw(Canvas& c, int x, int y, const MidiState& s) const {
     // this row's documentation, on a device with no manual and no tooltip. It is the same reasoning as
     // OUTPUT's port count above: a row has pixels to spare exactly when its value is the boring one.
     row_of(MidiRow::SYNC,     "SYNC",     s.settings.midiSyncOut ? "ON  24 PPQN" : "OFF");
-    // ⚠️ The value spells out what the channel is FOR, for SYNC's reason one line up: on its own a
-    // bare channel number on a screen that already has eight of them below it says nothing about
-    // which of the two kinds of incoming channel this is.
+    // ⚠️ The value spells out what the channel is FOR, for SYNC's reason one line up.
     // ⚠️ …and when the row CANNOT SEE the knobs that are arriving, it says where they are instead.
     // That is the one state a user cannot get out of on their own: the row asks for a channel number
     // and nothing else on the machine knows it. On ALL, and on the channel that matches, there is
     // nothing to report — the same pixel-budget argument as OUTPUT's port count two rows up.
     row_of(MidiRow::CTL_CH,   "CTL CH", ctl_ch_text(s));
+    row_of(MidiRow::KEYS,     "KEYS",     keys_text(s.settings.midiInVoices));
     row_of(MidiRow::PROG_CHG, "PROG CHG", s.project.midiSendProgramChange ? "ON" : "OFF");
-
-    // ── IN CH — the per-track input channel map (plan §7, §8.1's "TRACK INPUT MAP") ──────────────
-    //
-    // Eight cells, one per track, in track order. This is the row that answers "which of my tracks does
-    // this keyboard play", and until it existed the answer was a field in the .ptp that had to be typed
-    // by hand — `midiInputChannels` round-tripped from B1 and E1 was the first thing to READ it.
-    //
-    // ⚠️ **THE HEADER IS NOT DECORATION, IT IS WHAT MAKES THE ROW READABLE.** Without it the cells are
-    // eight identical `--` and the only way to know which is track 5 is to count. It is drawn in the
-    // blank row the group gap already reserves above this one, at the same cell x positions, so it
-    // costs no extra height. ⭐ `ptshot` is the only tool that can see whether those two lines line up
-    // — the same reason it caught the OUTPUT row's overprint.
-    {
-        const bool onMap    = on_row(MidiRow::IN_MAP) || on_row(MidiRow::IN_INS);
-        const int  mapY     = rowY(MidiRow::IN_MAP);
-        const int  headerY  = mapY - ROW_HEIGHT;
-        const int  cellX    = x + MAP_CELL_X;
-        const int  tracks   = std::min(MIDI_IN_MAP_COLUMNS,
-                                       static_cast<int>(s.project.midiInputChannels.size()));
-
-        for (int i = 0; i < tracks; ++i) {
-            // Centred over a two-digit cell: one glyph is CHAR_W narrower than the value above it.
-            // It is this row's COLUMN HEADER — the grids' convention, and the only thing that can say
-            // which of eight identical `--` the cursor is on, since the cell it fills is two glyphs
-            // wide and they all look alike.
-            c.draw_text(std::to_string(i + 1), cellX + MAP_CELL_PITCH * i + CHAR_W / 2,
-                        headerY + TEXT_PADDING,
-                        header_color(onMap ? s.cursorColumn : -1, i + 1, i + 1, t),
-                        CHAR_SPACING, FONT_SCALE);
-        }
-
-        const bool onCh  = on_row(MidiRow::IN_MAP);
-        const bool onIns = on_row(MidiRow::IN_INS);
-        const int  insY  = rowY(MidiRow::IN_INS);
-
-        c.draw_text("IN CH", labelX, mapY + TEXT_PADDING, onCh ? cursor_mark_ink(t) : t.textParam,
-                    CHAR_SPACING, FONT_SCALE);
-        // ⚠️ "INS", not "IN INS": the label column is read downwards, and IN CH above it already says
-        // that this pair is the input map. The word that distinguishes the two rows is the one drawn.
-        c.draw_text("INS", labelX, insY + TEXT_PADDING, onIns ? cursor_mark_ink(t) : t.textParam,
-                    CHAR_SPACING, FONT_SCALE);
-
-        for (int i = 0; i < tracks; ++i) {
-            draw_cursor_cell(c, map_cell_text(s.project.midiInputChannels[static_cast<size_t>(i)]),
-                             cellX + MAP_CELL_PITCH * i, mapY + TEXT_PADDING,
-                             onCh && (s.cursorColumn == i + 1), t.textValue, t);
-            draw_cursor_cell(c, map_instrument_text(map_instrument_at(s.project, i + 1)),
-                             cellX + MAP_CELL_PITCH * i, insY + TEXT_PADDING,
-                             onIns && (s.cursorColumn == i + 1), t.textValue, t);
-        }
-    }
 
     // The three action rows. Drawn like PROJECT's SYSTEM and EXIT, because they are the same kind of
     // thing: a row whose whole content is what A does on it.
@@ -309,27 +214,6 @@ CursorContext MidiModule::cursor_context(const MidiState& s) const {
         case MidiRow::INPUT:
             return cc::enum_cycle(s.inDeviceIndex, static_cast<int>(s.inDeviceNames.size()));
 
-        case MidiRow::IN_MAP: {
-            // ⚠️ **−1 IS THE EMPTY VALUE, WHICH IS WHAT MAKES A+B MEAN "THIS TRACK LISTENS TO NOTHING"**
-            // — the project's one empty convention (model.h), and the same context the instrument
-            // screen's BANK/PROG/CC cells use (`midi_opt_context`). Channel 0 is a real channel (shown
-            // `01`), so a cell that treated 0 as empty would make track 1's most likely setting
-            // undialable.
-            const int ch = map_channel_at(s.project, s.cursorColumn);
-            return cc::hex_byte(ch, /*min=*/0, /*max=*/15, /*empty_value=*/-1,
-                                /*can_delete=*/ch >= 0, /*can_insert=*/ch < 0);
-        }
-
-        case MidiRow::IN_INS: {
-            // The cell above it exactly, over the instrument pool's range instead of the sixteen
-            // channels: −1 is empty and means "whatever this track is playing", which is what the
-            // row did before it existed.
-            const int id = map_instrument_at(s.project, s.cursorColumn);
-            return cc::hex_byte(id, /*min=*/0, /*max=*/songcore::POOL_INSTRUMENTS - 1,
-                                /*empty_value=*/-1,
-                                /*can_delete=*/id >= 0, /*can_insert=*/id < 0);
-        }
-
         case MidiRow::OFFSET: {
             // ⚠️ `empty_value` is forced OUT OF RANGE. `hex_byte`'s default is −1, and −1 is a perfectly
             // ordinary offset — one millisecond early. Left at the default, the context would report
@@ -349,13 +233,16 @@ CursorContext MidiModule::cursor_context(const MidiState& s) const {
         case MidiRow::SYNC:
             return cc::toggle_binary(s.settings.midiSyncOut);
 
-        // The same cell as one of IN CH's, and deliberately so: both are "a channel, or none", so
-        // both delete to −1 and both show 01..16 over a stored 0..15.
+        // Shows 01..16 over a stored 0..15.
         // ⚠️⚠️ **A CYCLE OF SEVENTEEN, NOT A HEX BYTE WITH AN EMPTY STATE.** It was the latter, and the
         // cell advertised an INSERT that the write-back below did not accept — so the row sat on its
         // own empty value and A+D-PAD moved nothing, for ever. A cycle has no state to be stuck in.
         case MidiRow::CTL_CH:
             return cc::enum_cycle(ctl_ch_index(s.settings.midiControlChannel), CTL_CH_OPTIONS);
+
+        // Eight stops: MONO, then POLY 2..8. The stored value is the voice count, 1..8.
+        case MidiRow::KEYS:
+            return cc::enum_cycle(clamp(s.settings.midiInVoices, 1, 8) - 1, 8);
 
         case MidiRow::PROG_CHG:
             return cc::toggle_binary(s.project.midiSendProgramChange);
@@ -381,12 +268,7 @@ MidiInputResult MidiModule::handle_input(songcore::Project& project, SettingsVal
     MidiInputResult r;
     if (cursor_column == 0 || action.type == ActionType::NONE) return r;
 
-    // ⚠️ **THE `SET_VALUE`-ONLY GUARD MOVED OFF THE FRONT OF THIS FUNCTION IN E3, AND THAT IS THE
-    // INTERESTING PART OF THE DIFF.** Every row this screen had until now is a cycle or a number with
-    // no "unset" state, so DELETE and INSERT_DEFAULT had nothing to do and the early return was free.
-    // The IN CH cells have three states — off, and 0..15 — so they need all three actions, and a guard
-    // that had stayed where it was would have made A+B on a mapped track do nothing at all: an
-    // input channel you could dial past but never clear.
+    // Not an early return: OFFSET answers DELETE (A+B gives the row back to AUTO).
     const bool isSet = (action.type == ActionType::SET_VALUE);
 
     // The device rows: the module writes the NAME, not the index it was just handed — see the header.
@@ -408,39 +290,6 @@ MidiInputResult MidiModule::handle_input(songcore::Project& project, SettingsVal
         case MidiRow::INPUT:
             r.inDeviceChanged = pick_device(in_device_names, settings.midiInDevice);
             break;
-
-        case MidiRow::IN_MAP: {
-            // ⚠️ …and THIS dirties the SONG, for PROG CHG's reason below: `midiInputChannels` is a
-            // `Project` field that emits into the .ptp. Which track answers a keyboard is part of how
-            // the song is played, and it must travel with it.
-            const int track = cursor_column - 1;
-            if (track < 0 || track >= static_cast<int>(project.midiInputChannels.size())) break;
-            int& ch = project.midiInputChannels[static_cast<size_t>(track)];
-
-            const int before = ch;
-            if (isSet)                                          ch = clamp(action.value, 0, 15);
-            else if (action.type == ActionType::DELETE)         ch = -1;   // this track listens to none
-            else if (action.type == ActionType::INSERT_DEFAULT) ch = 0;    // channel 1, shown 01
-
-            r.projectModified = (ch != before);
-            break;
-        }
-
-        case MidiRow::IN_INS: {
-            // The song's, like the channel above it: which instrument a track answers a keyboard on
-            // is part of how the song is played.
-            const int track = cursor_column - 1;
-            if (track < 0 || track >= static_cast<int>(project.midiInputInstruments.size())) break;
-            int& id = project.midiInputInstruments[static_cast<size_t>(track)];
-
-            const int before = id;
-            if (isSet) id = clamp(action.value, 0, songcore::POOL_INSTRUMENTS - 1);
-            else if (action.type == ActionType::DELETE)         id = -1;  // back to "what it plays"
-            else if (action.type == ActionType::INSERT_DEFAULT) id = 0;   // instrument 00
-
-            r.projectModified = (id != before);
-            break;
-        }
 
         case MidiRow::OFFSET: {
             if (isSet) {
@@ -481,6 +330,11 @@ MidiInputResult MidiModule::handle_input(songcore::Project& project, SettingsVal
             r.controlChannelChanged = true;
             break;
         }
+
+        // Read by the frame loop every tick, so nothing is pushed from here.
+        case MidiRow::KEYS:
+            if (isSet) settings.midiInVoices = clamp(action.value, 0, 7) + 1;
+            break;
 
         case MidiRow::PROG_CHG:
             // ⚠️ …and THIS one dirties the SONG, where the cable rows do not. It is a `Project` field

@@ -723,7 +723,7 @@ int run(const AppConfig& cfg) {
         // different values, and a boot line stating the one nobody is sending with would be the
         // lying instrument in its cheapest form.
         std::printf("midi:    OUT %s (offset %+d ms%s, sync %s)\n",
-                    cfg.midiOut->is_open() ? state.settings.midiOutDevice.c_str() : "OFF",
+                    cfg.midiOut->is_open() ? state.midiOutOpenName.c_str() : "OFF",
                     ui::midi_offset_in_force(state.settings, state.midiAutoOffsetMs),
                     state.settings.midiOffsetAuto ? " AUTO" : "",
                     state.settings.midiSyncOut ? "ON 24 PPQN" : "off");
@@ -743,8 +743,8 @@ int run(const AppConfig& cfg) {
     const bool midiInPortWasOpen = cfg.midiIn && cfg.midiIn->is_open();
     if (cfg.midiIn) {
         std::printf("midi:    IN  %s (%d port(s) enumerated)\n",
-                    cfg.midiIn->is_open() ? state.settings.midiInDevice.c_str() : "OFF",
-                    static_cast<int>(state.midiInDeviceNames.size()) - 1);
+                    cfg.midiIn->is_open() ? state.midiInOpenName.c_str() : "OFF",
+                    static_cast<int>(state.midiInDeviceNames.size()) - ui::MIDI_FIRST_PORT);
     } else {
         // ⚠️ Since E5 every shipping platform HAS a backend (winmm, ALSA rawmidi, `MidiManager`), so
         // this arm now means "this build is none of the three" and nothing else. A Linux box whose
@@ -1668,16 +1668,6 @@ int run(const AppConfig& cfg) {
             running = false;
         }
 
-        // Which instrument a live MIDI key plays on a track the sequencer has not touched. Pushed
-        // every tick rather than on change, because the user moves the cursor between frames and there
-        // is no change notification to hook — the same reason SCALING is polled sixty lines below.
-        // The host publishes it to the audio thread's drain with the poll below, only when it changed.
-        //
-        // ⚠️ It is the instrument the UI is SHOWING, which is the one the A-button already auditions, and
-        // it exists so a correctly configured keyboard is not silent on a stopped song. `TrackInstruments`
-        // wins the moment the sequencer plays a note on that track (midi_in.h).
-        host.set_midi_in_instrument(state.currentInstrument);
-
         // ⚠️ The thru verdict can CHANGE mid-session — picking a port on the MIDI screen is exactly how
         // a user arrives at a loopback — and the boot line above would then be a lie for the rest of the
         // run. One line per transition, never per frame: the screen says `THRU OFF: LOOP` where the pick
@@ -1934,13 +1924,13 @@ int run(const AppConfig& cfg) {
     // for a path whose failure is silence. Four stages, so a break can be located rather than guessed:
     // the port received nothing (no cable, or the device is not sending), the queue dropped (the drain
     // is not keeping up), the parser saw orphans (the stream was joined mid-message), or the router
-    // routed nothing (nothing is mapped — and its four counters say which of the four reasons).
+    // routed nothing (its counters say which of the reasons).
     if (cfg.midiIn && (host.midi_in_bytes() > 0 || midiInPortWasOpen)) {
         MidiInBase* base = cfg.midiIn;
         const songcore::MidiInputRouter& r = host.midi_in_router();
         std::printf("midi in: %llu bytes at the port (%llu callbacks, %llu port errors), %llu drained, "
                     "%llu messages\n"
-                    "         routed %llu, dropped: %llu non-channel, %llu unmapped, %llu no-instrument, "
+                    "         routed %llu, dropped: %llu non-channel, %llu no-instrument, "
                     "%llu unsupported\n"
                     "         queue overflow %llu bytes, parser orphans %llu, messages with no record %llu\n"
                     "         dropped during an export %llu bytes, handled messages the UI never saw %llu\n"
@@ -1957,7 +1947,6 @@ int run(const AppConfig& cfg) {
                     static_cast<unsigned long long>(host.midi_in_messages()),
                     static_cast<unsigned long long>(r.routed()),
                     static_cast<unsigned long long>(r.nonChannel()),
-                    static_cast<unsigned long long>(r.unmapped()),
                     static_cast<unsigned long long>(r.noInstrument()),
                     static_cast<unsigned long long>(r.unsupported()),
                     static_cast<unsigned long long>(host.midi_in_sink().dropped()),

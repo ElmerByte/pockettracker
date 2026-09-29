@@ -24,25 +24,63 @@ void InputDispatcher::boot_midi_port() {
     host_.set_midi_sync_out(s_.settings.midiSyncOut);
 
     refresh_midi_devices();
-    if (port_open()) return;                       // the env override already opened this same device
+    if (port_open()) {                             // the env override already opened this same device
+        s_.midiOutOpenName = s_.settings.midiOutDevice;
+        return;
+    }
     if (s_.midiDeviceIndex != 0) apply_midi_device();
     s_.midiStatusText.clear();                     // boot news is the console's job, not the screen's
 }
 
-// Resolve a SAVED NAME against the list that exists right now. Not found → 0 → OFF, and that rule is
-// the whole reason the setting is a name and not an index: an index would silently come back pointing
-// at whatever port took its place. One definition for all four call sites (both directions of both
-// the OUT and IN pairs) so the not-found rule cannot be spelled differently in one of them.
-//
-// Index 0 is "OFF" and is never a device, so the search starts at 1.
+// Resolve a SAVED choice against the list that exists right now: AUTO is index 1, a device its place
+// in the list, and a name not found is 0 → OFF — the whole reason the setting is a name and not an
+// index: an index would silently come back pointing at whatever port took its place.
 static int resolve_port_index(const std::vector<std::string>& names, const std::string& want) {
-    for (size_t i = 1; i < names.size(); ++i)
+    if (want == MIDI_PORT_AUTO) return 1;
+    for (size_t i = MIDI_FIRST_PORT; i < names.size(); ++i)
         if (names[i] == want) return static_cast<int>(i);
     return 0;
 }
 
+static bool listed(const std::vector<std::string>& names, const std::string& name) {
+    return std::find(names.begin(), names.end(), name) != names.end();
+}
+
+// Open the first port the choice accepts — the named device, or under AUTO any device `skip` does not
+// rule out — and return its name, "" if none took. A port that refuses (another app holds it) goes on
+// `refused` and is passed over until it has left the list and come back, so the once-a-second scan
+// does not hammer a busy port.
+template <class Skip, class Open>
+static std::string open_first_port(const std::vector<std::string>& names, const std::string& choice,
+                                   std::vector<std::string>& refused, Skip skip, Open open) {
+    if (choice == MIDI_PORT_OFF) return {};
+    const bool autoPick = (choice == MIDI_PORT_AUTO);
+    for (size_t i = MIDI_FIRST_PORT; i < names.size(); ++i) {
+        const std::string& name = names[i];
+        const int          port = static_cast<int>(i) - MIDI_FIRST_PORT;
+        if (autoPick ? skip(port) : name != choice) continue;
+        if (listed(refused, name)) continue;
+        if (open(port)) return name;
+        refused.push_back(name);
+    }
+    return {};
+}
+
+static void forget_unlisted(std::vector<std::string>& refused, const std::vector<std::string>& names) {
+    refused.erase(std::remove_if(refused.begin(), refused.end(),
+                                 [&](const std::string& n) { return !listed(names, n); }),
+                  refused.end());
+}
+
+static std::string port_status(const std::string& choice, bool opened, bool anyRefused,
+                               const char* off, const char* opened_text, const char* busy) {
+    if (choice == MIDI_PORT_OFF) return off;
+    if (opened) return opened_text;
+    return anyRefused ? busy : "NO DEVICE YET";
+}
+
 void InputDispatcher::refresh_midi_devices() {
-    s_.midiDeviceNames.assign(1, "OFF");   // index 0, always — the module never handles "no device"
+    s_.midiDeviceNames.assign({MIDI_PORT_OFF, MIDI_PORT_AUTO});   // the module never handles "no device"
 
     if (s_.midiOut) {
         const int n = s_.midiOut->device_count();
@@ -52,35 +90,41 @@ void InputDispatcher::refresh_midi_devices() {
     s_.midiDeviceIndex = resolve_port_index(s_.midiDeviceNames, s_.settings.midiOutDevice);
 }
 
-void InputDispatcher::apply_midi_device() {
-    // Re-resolve first: `settings.midiOutDevice` is the choice, `midiDeviceIndex` is where that choice
-    // sits in the list the screen is drawing, and the module just changed the former.
-    const int wanted = resolve_port_index(s_.midiDeviceNames, s_.settings.midiOutDevice);
-    s_.midiDeviceIndex = wanted;
-
-    if (!s_.midiOut) { s_.midiStatusText = "NO MIDI BACKEND"; return; }
-
+void InputDispatcher::close_midi_out() {
     // ⚠️ THE PANIC IS OURS TO SEND — see the header. `set_out` panics on a POINTER change and the
     // pointer is not changing; only the device behind it is. Skip this and every note sounding on the
     // port we are about to close is held by that hardware until someone power-cycles it.
     host_.midi_out().panic();
     s_.midiOut->close();
+    s_.midiOutOpenName.clear();
+}
 
-    if (wanted == 0) {
-        s_.midiStatusText = "OUTPUT OFF";
-    } else if (s_.midiOut->open(wanted - 1)) {   // −1: index 0 of the list is OFF, not a device
-        s_.midiStatusText = "PORT OPENED";
-    } else {
-        // ⚠️ SAID OUT LOUD, and the setting is left alone. A port that refuses to open is usually one
-        // another app already holds exclusively — a transient the user can fix and retry — so throwing
-        // their choice away on the first failure would be the wrong repair. The row reads OFF because
-        // `is_open()` is false, which is the truth.
-        s_.midiStatusText = "PORT BUSY";
-    }
+bool InputDispatcher::open_midi_out() {
+    s_.midiOutOpenName = open_first_port(
+        s_.midiDeviceNames, s_.settings.midiOutDevice, midiOutRefused_,
+        [&](int port) { return s_.midiOut->is_builtin_synth(port); },
+        [&](int port) { return s_.midiOut->open(port); });
+    return !s_.midiOutOpenName.empty();
+}
+
+void InputDispatcher::apply_midi_device() {
+    // Re-resolve first: `settings.midiOutDevice` is the choice, `midiDeviceIndex` is where that choice
+    // sits in the list the screen is drawing, and the module just changed the former.
+    s_.midiDeviceIndex = resolve_port_index(s_.midiDeviceNames, s_.settings.midiOutDevice);
+
+    if (!s_.midiOut) { s_.midiStatusText = "NO MIDI BACKEND"; return; }
+
+    close_midi_out();
+    // A pick is the user's retry: a port that refused before gets asked again. The choice is KEPT when
+    // it refuses — usually another app holds the port, a transient the user can fix.
+    midiOutRefused_.clear();
+    const bool opened = open_midi_out();
+    s_.midiStatusText = port_status(s_.settings.midiOutDevice, opened, !midiOutRefused_.empty(),
+                                    "OUTPUT OFF", "PORT OPENED", "PORT BUSY");
 
     // ⭐ ONE call, below every arm, because the loopback verdict depends on which port is OPEN and each
-    // of the three arms above leaves that different — including "OUTPUT OFF", which is the arm that
-    // turns thru back ON. A rule repeated at each site is a rule one site will forget.
+    // arm above leaves that different — including "OUTPUT OFF", which is the arm that turns thru back
+    // ON. A rule repeated at each site is a rule one site will forget.
     update_midi_thru();   // the OUT row's half of the ONE verdict (E4) — see apply_midi_in_device
 }
 
@@ -104,7 +148,7 @@ void InputDispatcher::boot_midi_in_port() {
 }
 
 void InputDispatcher::refresh_midi_in_devices() {
-    s_.midiInDeviceNames.assign(1, "OFF");   // index 0, always — "no device" is a choice, not a gap
+    s_.midiInDeviceNames.assign({MIDI_PORT_OFF, MIDI_PORT_AUTO});
 
     if (s_.midiIn) {
         const int n = s_.midiIn->device_count();
@@ -114,56 +158,102 @@ void InputDispatcher::refresh_midi_in_devices() {
     s_.midiInDeviceIndex = resolve_port_index(s_.midiInDeviceNames, s_.settings.midiInDevice);
 }
 
-void InputDispatcher::apply_midi_in_device() {
-    const int wanted = resolve_port_index(s_.midiInDeviceNames, s_.settings.midiInDevice);
-    s_.midiInDeviceIndex = wanted;
-
-    if (!s_.midiIn) { s_.midiStatusText = "NO MIDI BACKEND"; return; }
-
+void InputDispatcher::close_midi_in() {
     // ⚠️ The teardown order, and every step of it answers a way this can go wrong — see the header.
     s_.midiIn->set_sink(nullptr);
     s_.midiIn->close();
     host_.reset_midi_in();
+    s_.midiInOpenName.clear();
+}
 
-    if (wanted == 0) {
-        s_.midiStatusText = "INPUT OFF";
-    } else {
-        // The sink BEFORE the open: an open port is already delivering, and bytes that arrive between
-        // the two would be dropped by a backend that has nowhere to put them — a silent loss at exactly
-        // the moment a user is watching to see whether their keyboard works.
-        s_.midiIn->set_sink(&host_.midi_in_sink());
-        if (s_.midiIn->open(wanted - 1)) {   // −1: index 0 of the list is OFF, not a device
-            s_.midiStatusText = "INPUT OPENED";
-        } else {
-            // The choice is KEPT, exactly as on the OUTPUT side: a port that refuses is usually one
-            // another app holds, which is a transient the user can fix. The sink is unwired again so a
-            // backend that half-opened cannot deliver into a port the app believes is closed.
+bool InputDispatcher::open_midi_in() {
+    s_.midiInOpenName = open_first_port(
+        s_.midiInDeviceNames, s_.settings.midiInDevice, midiInRefused_,
+        [](int) { return false; },
+        [&](int port) {
+            // The sink BEFORE the open: an open port is already delivering, and bytes that arrive
+            // between the two would be dropped. Unwired again on a refusal, so a backend that
+            // half-opened cannot deliver into a port the app believes is closed.
+            s_.midiIn->set_sink(&host_.midi_in_sink());
+            if (s_.midiIn->open(port)) return true;
             s_.midiIn->set_sink(nullptr);
-            s_.midiStatusText = "INPUT BUSY";
-        }
-    }
+            return false;
+        });
+    return !s_.midiInOpenName.empty();
+}
+
+void InputDispatcher::apply_midi_in_device() {
+    s_.midiInDeviceIndex = resolve_port_index(s_.midiInDeviceNames, s_.settings.midiInDevice);
+
+    if (!s_.midiIn) { s_.midiStatusText = "NO MIDI BACKEND"; return; }
+
+    close_midi_in();
+    midiInRefused_.clear();   // a pick is a retry, as on the OUTPUT side
+    const bool opened = open_midi_in();
+    s_.midiStatusText = port_status(s_.settings.midiInDevice, opened, !midiInRefused_.empty(),
+                                    "INPUT OFF", "INPUT OPENED", "INPUT BUSY");
 
     update_midi_thru();   // …and the IN half of the same one verdict (E4) — see apply_midi_device
 }
 
-void InputDispatcher::update_midi_thru() {
-    // ⚠️ **BOTH PORTS OPEN, OR THERE IS NOTHING TO LOOP.** `is_open()` and not the saved choice: a
-    // device that was picked and then refused to open (PORT BUSY) is a port sending nothing, and
-    // suppressing thru for it would silence a feature over a cable that does not exist.
-    const bool inOpen  = s_.midiIn != nullptr && s_.midiIn->is_open() && s_.midiInDeviceIndex > 0;
-    const bool outOpen = port_open() && s_.midiDeviceIndex > 0;
+// ─── Hot-plug ────────────────────────────────────────────────────────────────────────────────────
 
-    // The two names the SCREEN is showing. On every backend this project has met, a loopback's two
-    // directions carry the SAME display name (winmm's "loopMIDI Port" both ways) — a hardware keyboard
-    // and a hardware synth never do, because they are two different devices.
-    // ⚠️ Index 0 is "OFF" on both lists, which is why the `> 0` above is part of the predicate and not
-    // an optimisation: without it, two closed ports would compare equal and turn thru off.
-    const bool loopback =
-        inOpen && outOpen &&
-        static_cast<size_t>(s_.midiInDeviceIndex) < s_.midiInDeviceNames.size() &&
-        static_cast<size_t>(s_.midiDeviceIndex)   < s_.midiDeviceNames.size() &&
-        s_.midiInDeviceNames[static_cast<size_t>(s_.midiInDeviceIndex)] ==
-            s_.midiDeviceNames[static_cast<size_t>(s_.midiDeviceIndex)];
+void InputDispatcher::run_midi_hotplug() {
+    // Once a second, rescan both lists: a device that has gone is closed, and a device the choice
+    // names — or under AUTO the first one plugged in — is opened. Nothing is overwritten in the
+    // settings; a second device plugged in while one is open is left alone. A poll because winmm has
+    // no notification at all, and one mechanism is easier to trust than three.
+    if (now_ms_ < midiScanDueMs_) return;
+    midiScanDueMs_ = now_ms_ + MIDI_SCAN_MS;
+
+    bool changed = false;
+
+    if (s_.midiOut) {
+        refresh_midi_devices();
+        forget_unlisted(midiOutRefused_, s_.midiDeviceNames);
+        const std::string was = s_.midiOutOpenName;
+        if (!was.empty() &&
+            (s_.midiOut->broken() || !s_.midiOut->is_open() || !listed(s_.midiDeviceNames, was))) {
+            close_midi_out();
+            s_.statusMessage = "MIDI OUT UNPLUGGED";
+            s_.statusSuccess = false;
+            changed = true;
+        }
+        if (s_.midiOutOpenName.empty() && open_midi_out()) {
+            s_.statusMessage = "MIDI OUT: " + s_.midiOutOpenName;
+            s_.statusSuccess = true;
+            changed = true;
+        }
+    }
+
+    if (s_.midiIn) {
+        refresh_midi_in_devices();
+        forget_unlisted(midiInRefused_, s_.midiInDeviceNames);
+        const std::string was = s_.midiInOpenName;
+        if (!was.empty() &&
+            (s_.midiIn->broken() || !s_.midiIn->is_open() || !listed(s_.midiInDeviceNames, was))) {
+            close_midi_in();
+            s_.statusMessage = "MIDI IN UNPLUGGED";
+            s_.statusSuccess = false;
+            changed = true;
+        }
+        if (s_.midiInOpenName.empty() && open_midi_in()) {
+            s_.statusMessage = "MIDI IN: " + s_.midiInOpenName;
+            s_.statusSuccess = true;
+            changed = true;
+        }
+    }
+
+    if (changed) update_midi_thru();
+}
+
+void InputDispatcher::update_midi_thru() {
+    // ⚠️ **BOTH PORTS OPEN, OR THERE IS NOTHING TO LOOP** — the OPEN names, not the saved choices: a
+    // device that was picked and refused (PORT BUSY) sends nothing, and suppressing thru for it would
+    // silence a feature over a cable that does not exist.
+    // On every backend this project has met, a loopback's two directions carry the SAME display name
+    // (winmm's "loopMIDI Port" both ways).
+    const bool loopback = !s_.midiInOpenName.empty() && s_.midiInOpenName == s_.midiOutOpenName;
 
     host_.set_midi_in_thru(!loopback);
 

@@ -1248,10 +1248,8 @@ class InputDispatcher {
     /**
      * Re-enumerate the ports and re-resolve the saved device NAME against the fresh list.
      *
-     * ⚠️ CALLED ON EVERY ENTRY TO THE SCREEN, not once at boot. MIDI is hot-pluggable: a list built at
-     * launch is a list of the cables that were in at launch, and the screen whose whole job is picking
-     * one is exactly where that is a bug the user cannot diagnose. Cheap — `device_count()` is an OS
-     * call on a handful of ports, once per screen entry, not per frame.
+     * Called on every entry to the screen and once a second by `run_midi_hotplug`: a list built at
+     * launch is a list of the cables that were in at launch.
      *
      * A saved name that is not in the list resolves to index 0 = OFF, and that is the honest answer:
      * the row shows what is OPEN, never what was once wanted (see midi_settings.h).
@@ -1283,6 +1281,22 @@ class InputDispatcher {
      * a port that is open is a port already delivering.
      */
     void apply_midi_in_device();
+
+    /** Close the port and forget which device it was. OUT panics first — see `apply_midi_device`. */
+    void close_midi_out();
+    void close_midi_in();
+    /** Open what the setting asks for (a device, or AUTO's first); false if nothing took. */
+    bool open_midi_out();
+    bool open_midi_in();
+
+    /** The once-a-second rescan: close a device that has gone, open one that has arrived. */
+    void run_midi_hotplug();
+
+    static constexpr long long MIDI_SCAN_MS = 1000;
+    long long                  midiScanDueMs_ = 0;
+    // Devices that refused to open (another app holds them) — not retried until they leave the list.
+    std::vector<std::string>   midiOutRefused_;
+    std::vector<std::string>   midiInRefused_;
 
     /**
      * ⭐ **THE THRU VERDICT (E4): is the port we listen on the same one we send on?**

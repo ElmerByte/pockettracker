@@ -377,14 +377,6 @@ inline Project parse_project(const json& j) {
     p.scaleKey    = get_int(j, "scaleKey", p.scaleKey);
     p.midiSyncOut           = get_int(j, "midiSyncOut", p.midiSyncOut);
     p.midiSendProgramChange = get_bool(j, "midiSendProgramChange", p.midiSendProgramChange);
-    { auto it = j.find("midiInputChannels");
-      if (it != j.end() && it->is_array())
-          for (size_t t = 0; t < p.midiInputChannels.size() && t < it->size(); ++t)
-              if ((*it)[t].is_number()) p.midiInputChannels[t] = (*it)[t].get<int>(); }
-    { auto it = j.find("midiInputInstruments");
-      if (it != j.end() && it->is_array())
-          for (size_t t = 0; t < p.midiInputInstruments.size() && t < it->size(); ++t)
-              if ((*it)[t].is_number()) p.midiInputInstruments[t] = (*it)[t].get<int>(); }
     // ⚠️ Truncated at the cap rather than taken whole: every incoming CC sweeps this list, ~30 times
     // a second per knob, so its length is a cost the audio path pays. Only a hand-written file can be
     // longer — the screen's ADD row refuses past the same number.
@@ -847,18 +839,6 @@ inline std::string serialize_project(const Project& p) {
     // the inverted one — the field appears only when the user has turned it OFF.
     if (p.midiSyncOut != 0)          w.field_int("midiSyncOut", p.midiSyncOut);
     if (!p.midiSendProgramChange)    w.field_bool("midiSendProgramChange", p.midiSendProgramChange);
-    if (p.midiInputChannels != std::vector<int>(8, -1)) {
-        w.key("midiInputChannels");
-        w.begin_array();
-        for (int c : p.midiInputChannels) { w.element(); w.value_int(c); }
-        w.end_array();
-    }
-    if (p.midiInputInstruments != std::vector<int>(8, -1)) {
-        w.key("midiInputInstruments");
-        w.begin_array();
-        for (int i : p.midiInputInstruments) { w.element(); w.value_int(i); }
-        w.end_array();
-    }
     // ⚠️ OMITTED WHOLE WHEN THERE ARE NONE, and that is what keeps every .ptp already on disk — and
     // the nine goldens — byte-identical: a song that has never opened the MAPPING screen emits not one
     // new byte. Inside a mapping the fields are guarded against their own struct defaults, the same

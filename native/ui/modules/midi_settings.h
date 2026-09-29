@@ -50,6 +50,12 @@ struct AudioLoad {
     int worstLoad   = 0;
 };
 
+// A port list is OFF, AUTO, then the devices. AUTO takes the first device plugged in and follows
+// it through unplug/replug; a device NAME is kept for that device alone.
+constexpr int         MIDI_FIRST_PORT = 2;
+inline constexpr char MIDI_PORT_OFF[]  = "OFF";
+inline constexpr char MIDI_PORT_AUTO[] = "AUTO";
+
 struct MidiState {
     /** PROG CHG lives on the project — it is what the SONG means, so it travels in the .ptp. */
     const songcore::Project& project;
@@ -58,10 +64,9 @@ struct MidiState {
     const SettingsValues& settings;
 
     /**
-     * The port lists, ALWAYS with "OFF" at index 0 — the dispatcher builds them by asking the platform
-     * and prepending that entry, so the module never has to special-case "no device" as a separate
-     * state. Empty is impossible; a machine with no ports still gets `{"OFF"}`, which is where
-     * `AppState` starts them.
+     * The port lists, ALWAYS with "OFF" and "AUTO" in front — the dispatcher builds them by asking the
+     * platform and prepending those two, so the module never has to special-case "no device" as a
+     * separate state. A machine with no ports still gets `{"OFF", "AUTO"}`.
      *
      * ⚠️ IN AND OUT ARE TWO SEPARATE LISTS AND MUST NOT BE COLLAPSED INTO ONE. A machine's MIDI inputs
      * and outputs are different sets, indexed independently, and a port that is both (loopMIDI, a
@@ -75,6 +80,10 @@ struct MidiState {
     const std::vector<std::string>& deviceNames;
     const std::vector<std::string>& inDeviceNames;
 
+    /** The device actually open in each direction, "" for none — what the AUTO entry shows. */
+    std::string outOpenName{};
+    std::string inOpenName{};
+
     /**
      * What the OFFSET row uses while AUTO is on: the output latency the audio device reported at
      * boot, in milliseconds. A platform fact, so it arrives the same way the port lists above do —
@@ -83,11 +92,7 @@ struct MidiState {
     int autoOffsetMs = 0;
 
     int cursorRow    = 0;   // a MidiRow
-    /**
-     * 1 on every row but IN CH, where it is 1..`MIDI_IN_MAP_COLUMNS` — one per track. Column 0 is the
-     * row LABEL on every row and is unreachable, as on PROJECT.
-     */
-    int cursorColumn = 1;
+    int cursorColumn = 1;   // always 1: column 0 is the row LABEL and is unreachable, as on PROJECT
 
     /** Indices into the two lists above. */
     int deviceIndex   = 0;
@@ -125,7 +130,7 @@ inline int midi_offset_in_force(const SettingsValues& s, int autoOffsetMs) {
 }
 
 struct MidiInputResult {
-    bool projectModified = false;   // PROG CHG and IN CH — the rows that dirty the SONG
+    bool projectModified = false;   // PROG CHG — the row that dirties the SONG
     bool deviceChanged   = false;   // OUTPUT — the dispatcher must now (re)open a port
     bool inDeviceChanged = false;   // INPUT  — likewise, and the sink goes with it (E2's rule)
     bool offsetChanged   = false;   // OFFSET — the dispatcher must push it to the consumer
