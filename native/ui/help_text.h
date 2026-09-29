@@ -1243,13 +1243,13 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "fall, for as long as the note",
       "goes on."},
      {"A+←/→ steps 1, A+↑/↓ steps 16",
-      "A+B sets it back to 80"}},
+      "A+B resets the value"}},
     /* MOD_RELEASE */
     {"REL: time to fall at the end", "Starts when the note stops.", "",
      {"How long it takes to fall away",
       "once the note ends."},
      {"A+←/→ steps 1, A+↑/↓ steps 16",
-      "A+B sets it back to 00"}},
+      "A+B resets the value"}},
     /* MOD_OSC */
     {"OSC: the LFO shape", "Triangle, sine, ramps and", "squares, plus two random.",
      {"The wave the LFO follows:",
@@ -2452,6 +2452,15 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
     switch (type) {
         case songcore::InstrumentType::EXTERNAL:  return instrument_external_topic(row, column);
         case songcore::InstrumentType::SOUNDFONT: return instrument_sample_topic(true, row, column);
+        case songcore::InstrumentType::SYNTH:
+            if (row <= 3) return instrument_sample_topic(false, row, column);
+            if (row == 7) return column == 3 ? HelpTopic::INST_FILTER : HelpTopic::NONE;
+            if (row == 8) return column == 1 ? HelpTopic::INST_FILTER_FREQ : HelpTopic::INST_FILTER_RES;
+            if (row == 9) return column == 1 ? HelpTopic::MOD_ATTACK : HelpTopic::MOD_DECAY;
+            if (row == 10) return column == 1 ? HelpTopic::MOD_SUSTAIN : HelpTopic::MOD_RELEASE;
+            if (row == 11) return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
+            if (row == 12) return HelpTopic::INST_EQ;
+            return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }
 }

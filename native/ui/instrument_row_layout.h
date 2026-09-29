@@ -110,12 +110,24 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_EXTERNAL[] = {
     InstrumentRowKind::DUAL,    // 12  CC D
 };
 
+inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
+    InstrumentRowKind::NAME, InstrumentRowKind::SINGLE,
+    InstrumentRowKind::TRIPLE, InstrumentRowKind::TRIPLE,
+    InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
+    InstrumentRowKind::SPACER, InstrumentRowKind::DUAL,
+    InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
+    InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
+    InstrumentRowKind::SINGLE,
+};
+
 inline constexpr int INSTRUMENT_ROWS_SAMPLER_COUNT =
     static_cast<int>(sizeof(INSTRUMENT_ROWS_SAMPLER) / sizeof(INSTRUMENT_ROWS_SAMPLER[0]));
 inline constexpr int INSTRUMENT_ROWS_SOUNDFONT_COUNT =
     static_cast<int>(sizeof(INSTRUMENT_ROWS_SOUNDFONT) / sizeof(INSTRUMENT_ROWS_SOUNDFONT[0]));
 inline constexpr int INSTRUMENT_ROWS_EXTERNAL_COUNT =
     static_cast<int>(sizeof(INSTRUMENT_ROWS_EXTERNAL) / sizeof(INSTRUMENT_ROWS_EXTERNAL[0]));
+inline constexpr int INSTRUMENT_ROWS_SYNTH_COUNT =
+    static_cast<int>(sizeof(INSTRUMENT_ROWS_SYNTH) / sizeof(INSTRUMENT_ROWS_SYNTH[0]));
 
 /** The first row of the EXTERNAL layout's CC block — CC A. The three below it follow. */
 inline constexpr int INSTRUMENT_EXTERNAL_CC_ROW = 9;
@@ -125,6 +137,7 @@ inline int instrument_row_count(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return INSTRUMENT_ROWS_SOUNDFONT_COUNT;
         case songcore::InstrumentType::EXTERNAL:  return INSTRUMENT_ROWS_EXTERNAL_COUNT;
+        case songcore::InstrumentType::SYNTH:     return INSTRUMENT_ROWS_SYNTH_COUNT;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return INSTRUMENT_ROWS_SAMPLER_COUNT;
@@ -138,6 +151,7 @@ inline InstrumentRowKind instrument_row_kind(songcore::InstrumentType type, int 
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return INSTRUMENT_ROWS_SOUNDFONT[r];
         case songcore::InstrumentType::EXTERNAL:  return INSTRUMENT_ROWS_EXTERNAL[r];
+        case songcore::InstrumentType::SYNTH:     return INSTRUMENT_ROWS_SYNTH[r];
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return INSTRUMENT_ROWS_SAMPLER[r];
@@ -145,7 +159,7 @@ inline InstrumentRowKind instrument_row_kind(songcore::InstrumentType type, int 
 
 /** Does row 0 carry a source LOAD button (and, on a sampler, an EDIT)? EXTERNAL has no source. */
 inline bool instrument_has_source_row(songcore::InstrumentType type) {
-    return type != songcore::InstrumentType::EXTERNAL;
+    return type == songcore::InstrumentType::SAMPLER || type == songcore::InstrumentType::SOUNDFONT;
 }
 
 /**
@@ -158,6 +172,7 @@ inline int instrument_name_row_max_column(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return 2;
         case songcore::InstrumentType::EXTERNAL:  return 1;
+        case songcore::InstrumentType::SYNTH:     return 1;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return 3;
@@ -196,6 +211,7 @@ inline int instrument_eq_row(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return 14;
         case songcore::InstrumentType::EXTERNAL:  return -1;
+        case songcore::InstrumentType::SYNTH:     return 12;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return 12;

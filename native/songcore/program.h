@@ -36,7 +36,7 @@ constexpr float C4_HZ = 261.63f;
 
 // Instrument kinds, as numbers — InstrumentType's own order. ⚠️ A member's number is its identity:
 // append, never insert.
-enum ProgramType : int8_t { PROGRAM_SAMPLER = 0, PROGRAM_SOUNDFONT = 1, PROGRAM_EXTERNAL = 2 };
+enum ProgramType : int8_t { PROGRAM_SAMPLER = 0, PROGRAM_SOUNDFONT = 1, PROGRAM_EXTERNAL = 2, PROGRAM_SYNTH = 3 };
 
 // ─── Program ─────────────────────────────────────────────────────────────────────────────────────
 // One instrument, flattened. Built by make_program() (voice_derive.h) from an Instrument plus the two
@@ -46,7 +46,7 @@ enum ProgramType : int8_t { PROGRAM_SAMPLER = 0, PROGRAM_SOUNDFONT = 1, PROGRAM_
 // Program. A long-lived copy (the engine's program table) has to supply its own array.
 struct Program {
     int8_t  type           = PROGRAM_SAMPLER;
-    bool    hasSample      = false;   // sampleFilePath is set — THE empty-slot test, nothing else is
+    bool    hasSample      = false;   // sampler file is set, or the built-in synth has a generated wave
     bool    hasSoundfont   = false;   // soundfontPath is set
     int32_t sampleId       = -1;
     int32_t rootMidi       = 60;      // note_to_midi(root); -1 for an empty note, as the model gives it
@@ -212,8 +212,7 @@ inline SamplerNoteArgs derive_sampler_note(const NoteOnPayload& n, int64_t frame
                                            int instrumentId, const Program& p,
                                            int tempo, int sampleRate, int64_t sampleLength) {
     SamplerNoteArgs a;
-    // ⚠️ An empty slot is "no sample FILE", nothing else. Without this, stale engine-side PCM would
-    // sound for an instrument the UI shows as empty.
+    // An empty sampler slot has no file; a synth has its generated waveform.
     if (!p.hasSample) return a;   // valid = false → dropped
 
     // The record carries the MIDI number; recover (pitch, octave) by the raw formula — a 0..127 guard

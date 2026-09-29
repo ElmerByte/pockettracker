@@ -107,24 +107,20 @@ void InputDispatcher::request_instrument_type_toggle(int delta) {
  * forwards. The cycle runs on a COUNT rather than a chain of ternaries, so a fourth type joins it by
  * existing.
  *
- * ⚠️ EXTERNAL is the LAST type, and a build with the MIDI surfaces hidden simply stops one short.
- * That works for the same reason the FX list can be shortened (songcore/effects.h): the hidden entry
- * is a tail, so every reachable value keeps its meaning. The cycle is the only way to REACH the type
- * — an instrument already set to it, from a .ptp or a .pti, keeps it and keeps drawing as EXTERNAL.
+ * A build with MIDI authoring hidden skips EXTERNAL while retaining the saved enum values. An
+ * instrument already set to EXTERNAL in a project or preset still draws as EXTERNAL.
  */
 void InputDispatcher::toggle_instrument_type(int delta) {
     Project&    p   = host_.edit_project();
     Instrument& ins = p.instruments[static_cast<size_t>(s_.currentInstrument)];
 
-    const int count = s_.caps.midi ? songcore::INSTRUMENT_TYPE_COUNT
-                                   : songcore::INSTRUMENT_TYPE_COUNT - 1;
     const int cur   = static_cast<int>(ins.instrumentType);
     const int step  = delta < 0 ? -1 : +1;
-    // An instrument that is ALREADY external in a build that hides the type is outside the cycle:
-    // `cur` is `count`, and the modulo would land it back on itself. Step from the last reachable
-    // type instead, so the gesture still has somewhere to go.
-    const int from  = (cur >= count) ? count - 1 : cur;
-    const auto next = static_cast<songcore::InstrumentType>(((from + step) % count + count) % count);
+    int candidate = cur;
+    do {
+        candidate = (candidate + step + songcore::INSTRUMENT_TYPE_COUNT) % songcore::INSTRUMENT_TYPE_COUNT;
+    } while (!s_.caps.midi && candidate == static_cast<int>(songcore::InstrumentType::EXTERNAL));
+    const auto next = static_cast<songcore::InstrumentType>(candidate);
 
     // The name the slot would have adopted from the source it is ABOUT to lose — read before the
     // change, exactly as a source load reads it. See the adopt rule at the end of browser activation:

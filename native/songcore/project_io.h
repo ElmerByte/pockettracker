@@ -258,6 +258,7 @@ inline Instrument parse_instrument(const json& j, int index) {
           for (const auto& m : *it) i.modSlots.push_back(parse_mod_slot(m));
       } }
     { auto it = j.find("instrumentType"); if (it != j.end() && it->is_string()) instrument_type_from_name(it->get<std::string>(), i.instrumentType); }
+    i.synthWave = std::max(0, std::min(3, get_int(j, "synthWave", i.synthWave)));
     i.soundfontPath  = get_opt_str(j, "soundfontPath");
     i.sfBank         = get_int(j, "sfBank", i.sfBank);
     i.sfPreset       = get_int(j, "sfPreset", i.sfPreset);
@@ -735,6 +736,7 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     for (const auto& m : i.modSlots) { w.element(); emit_mod_slot(w, m); }
     w.end_array();
     if (i.instrumentType != InstrumentType::SAMPLER) w.field_string("instrumentType", instrument_type_name(i.instrumentType));
+    if (i.synthWave != 0) w.field_int("synthWave", i.synthWave);
     if (i.soundfontPath)    w.field_string("soundfontPath", *i.soundfontPath);
     if (i.sfBank != 0)      w.field_int("sfBank", i.sfBank);
     if (i.sfPreset != 0)    w.field_int("sfPreset", i.sfPreset);

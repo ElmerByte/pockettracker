@@ -191,6 +191,7 @@ private:
      * the two shipped types keep the exact path they had.
      */
     void draw_external(Canvas& c, int x, int y, const InstrumentEditorState& s) const;
+    void draw_synth(Canvas& c, int x, int y, const InstrumentEditorState& s) const;
 
     void draw_eq_row(Canvas& c, int y, int name_x, int value_x, int eq_slot,
                      const std::string& n2, const std::string& v2,

@@ -80,11 +80,10 @@ enum class ModDest {
     SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH
 };
 // The instrument's ROUTING DESTINATION — which sound module consumes its event stream (MIDI plan §1),
-// not "what kind of instrument it is". SAMPLER and SOUNDFONT are consumed by EngineConsumer; EXTERNAL
-// leaves the process as MIDI bytes (ExternalConsumer, midi_out.h). Future synth modules append here.
-// ⚠️ EXTERNAL STAYS LAST. A build without the MIDI surfaces (native/ui/platform_caps.h `midi`) walks
-// the TYPE cell over one type fewer, which only hides EXTERNAL while EXTERNAL is the tail.
-enum class InstrumentType { SAMPLER, SOUNDFONT, EXTERNAL };
+// not "what kind of instrument it is". SAMPLER, SOUNDFONT and SYNTH are consumed by EngineConsumer;
+// EXTERNAL leaves the process as MIDI bytes (ExternalConsumer, midi_out.h). Values are persisted, so
+// new types append; the UI skips EXTERNAL explicitly when MIDI authoring is hidden.
+enum class InstrumentType { SAMPLER, SOUNDFONT, EXTERNAL, SYNTH };
 
 inline const char* mod_type_name(ModType t) {
     switch (t) {
@@ -144,6 +143,7 @@ inline const char* instrument_type_name(InstrumentType t) {
     switch (t) {
         case InstrumentType::SOUNDFONT: return "SOUNDFONT";
         case InstrumentType::EXTERNAL:  return "EXTERNAL";
+        case InstrumentType::SYNTH:     return "SYNTH";
         case InstrumentType::SAMPLER:   break;
     }
     return "SAMPLER";
@@ -152,10 +152,11 @@ inline bool instrument_type_from_name(const std::string& s, InstrumentType& out)
     if (s == "SAMPLER")   { out = InstrumentType::SAMPLER;   return true; }
     if (s == "SOUNDFONT") { out = InstrumentType::SOUNDFONT; return true; }
     if (s == "EXTERNAL")  { out = InstrumentType::EXTERNAL;  return true; }
+    if (s == "SYNTH")     { out = InstrumentType::SYNTH;     return true; }
     return false;
 }
 /** How many entries InstrumentType has — the INSTRUMENT screen's TYPE cell cycles on it. */
-inline constexpr int INSTRUMENT_TYPE_COUNT = 3;
+inline constexpr int INSTRUMENT_TYPE_COUNT = 4;
 
 // ─── display names (ModType.displayName / ModDest.displayName) ──────────────────────────────────
 //
@@ -526,6 +527,7 @@ struct Instrument {
     int tableId = -1, tableTicRate = 0x06;
     std::vector<ModSlot> modSlots = std::vector<ModSlot>(4);  // Array<ModSlot>(4)
     InstrumentType instrumentType = InstrumentType::SAMPLER;
+    int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square
     std::optional<std::string> soundfontPath;    // null
     int sfBank = 0, sfPreset = 0;
     SFOverrides sfOverrides{};

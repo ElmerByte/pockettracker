@@ -382,7 +382,9 @@ struct Voice : public IAudioVoice {
             }
         }
         // Looping voice: abandon the loop so playback runs out into the [loopEnd, end] tail.
-        if (hasRelease && loopMode != 0) loopReleasing = true;
+        // An oscillator's cycle has no one-shot tail. Keep cycling while its ADSR releases;
+        // the modulation updater stops the voice when the envelope reaches zero.
+        if (hasRelease && loopMode != 0 && loopMode != LOOP_MODE_OSCILLATOR) loopReleasing = true;
         return hasRelease;
     }
 

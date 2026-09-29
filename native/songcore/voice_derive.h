@@ -61,8 +61,9 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     Program p;
     p.type            = (ins.instrumentType == InstrumentType::SOUNDFONT) ? PROGRAM_SOUNDFONT
                       : (ins.instrumentType == InstrumentType::EXTERNAL) ? PROGRAM_EXTERNAL
+                      : (ins.instrumentType == InstrumentType::SYNTH) ? PROGRAM_SYNTH
                                                                          : PROGRAM_SAMPLER;
-    p.hasSample       = ins.sampleFilePath.has_value();
+    p.hasSample       = ins.instrumentType == InstrumentType::SYNTH || ins.sampleFilePath.has_value();
     p.hasSoundfont    = ins.soundfontPath.has_value();
     p.sampleId        = ins.sampleId;
     p.rootMidi        = note_to_midi(ins.root);
@@ -72,9 +73,9 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     p.sfBank          = ins.sfBank;
     p.sfPreset        = ins.sfPreset;
     p.tableTicRate    = ins.tableTicRate;
-    p.slicingMode     = ins.slicingMode;
-    p.sliceMarkers    = ins.sliceMarkers.empty() ? nullptr : ins.sliceMarkers.data();
-    p.sliceCount      = static_cast<int32_t>(ins.sliceMarkers.size());
+    p.slicingMode     = ins.instrumentType == InstrumentType::SYNTH ? 0 : ins.slicingMode;
+    p.sliceMarkers    = (ins.instrumentType == InstrumentType::SYNTH || ins.sliceMarkers.empty()) ? nullptr : ins.sliceMarkers.data();
+    p.sliceCount      = ins.instrumentType == InstrumentType::SYNTH ? 0 : static_cast<int32_t>(ins.sliceMarkers.size());
     return p;
 }
 
@@ -238,8 +239,11 @@ void push_instrument_mod_eq_sends(Engine& engine, const Instrument& ins, int tem
 // name, which is why the SF and sampler setup paths push identical params.)
 template <typename Engine>
 void push_instrument_playback_params(Engine& engine, const Instrument& ins) {
-    engine.setInstrumentParams(ins.sampleId, ins.sampleStart, ins.sampleEnd, ins.reverse,
-                               loop_mode_code(ins.loopMode), ins.loopStart, ins.loopEnd,
+    const bool synth = ins.instrumentType == InstrumentType::SYNTH;
+    engine.setInstrumentParams(ins.sampleId, synth ? 0 : ins.sampleStart, synth ? 255 : ins.sampleEnd,
+                               synth ? false : ins.reverse,
+                               synth ? loop_mode_code("osc") : loop_mode_code(ins.loopMode),
+                               synth ? 0 : ins.loopStart, synth ? 255 : ins.loopEnd,
                                ins.drive, ins.crush, ins.downsample,
                                filter_type_code(ins.filterType), ins.filterCut, ins.filterRes);
 }
@@ -374,7 +378,7 @@ void plan_note_on(Engine& engine, const Event& ev, const Project& project, const
     }
 
     // ── Sampler path ─────────────────────────────────────────────────────────────────────────────
-    if (!program.hasSample) return;   // sampleFilePath == null — the empty-slot convention
+    if (!program.hasSample) return;   // empty sampler slot; a synth has a generated waveform
 
     ensure_table_loaded(tableId);
     push_instrument_state();

@@ -40,12 +40,18 @@ int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
  */
 std::string midi_opt(int v) { return v < 0 ? "--" : hex2(v); }
 
+const songcore::ModSlot& synth_amp(const Instrument& ins) {
+    static const songcore::ModSlot empty{};
+    return ins.modSlots.empty() ? empty : ins.modSlots[0];
+}
+
 }  // namespace
 
 // ─── Draw ────────────────────────────────────────────────────────────────────────────────────────
 
 void InstrumentEditorModule::draw(Canvas& c, int x, int y, const InstrumentEditorState& s) const {
     if (s.is_external()) { draw_external(c, x, y, s); return; }
+    if (s.type() == InstrumentType::SYNTH) { draw_synth(c, x, y, s); return; }
 
     const Theme&      t   = s.theme;
     const Instrument& ins = s.instrument;
@@ -171,6 +177,48 @@ void InstrumentEditorModule::draw(Canvas& c, int x, int y, const InstrumentEdito
 
     // Status messages ("SF LOADED", "SRC MISSING") are the global overlay's, drawn on the visualizer
     // header — not inside this module. Same split as the Kotlin.
+}
+
+void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
+                                        const InstrumentEditorState& s) const {
+    const Theme& t = s.theme;
+    const Instrument& ins = s.instrument;
+    const int nameX = x + 10, valueX = x + 150;
+    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    int rowY = y + TEXT_PADDING;
+    c.draw_text("INSTRUMENT " + hex2(ins.id), nameX, rowY, t.textTitle, CHAR_SPACING, FONT_SCALE);
+    rowY += ROW_HEIGHT + 14;
+    draw_type_load_row(c, x, rowY, nameX, valueX, ins, s.cursorRow, s.cursorColumn, 0, t);
+    rowY += ROW_HEIGHT;
+    draw_name_row(c, rowY, nameX, valueX, s, 1, t);
+    rowY += ROW_HEIGHT;
+    draw_triple_row(c, x, rowY, nameX, "ROOT", note_name(ins.root), "DETUNE", hex2(ins.detune),
+                    "TIC", hex2(ins.tableTicRate), s.cursorRow, s.cursorColumn, 2, t);
+    rowY += ROW_HEIGHT;
+    draw_triple_row(c, x, rowY, nameX, "VOL", hex2(ins.volume), "TSP",
+                    ins.transposeEnabled ? "on" : "off", "PAN", hex2(ins.pan),
+                    s.cursorRow, s.cursorColumn, 3, t);
+    rowY += ROW_HEIGHT * 2;
+    draw_section_source_row(c, x, rowY, nameX, s.cursorRow, s.cursorColumn, 5, t);
+    rowY += ROW_HEIGHT * 2;
+    static const char* waves[] = {"sin", "tri", "saw", "sqr"};
+    draw_dual_row(c, rowY, nameX, valueX, "WAVE", waves[clamp(ins.synthWave, 0, 3)],
+                  "FILTER", ins.filterType, s.cursorRow, s.cursorColumn, 7, t);
+    rowY += ROW_HEIGHT;
+    draw_dual_row(c, rowY, nameX, valueX, "FREQ", hex2(ins.filterCut), "RES",
+                  hex2(ins.filterRes), s.cursorRow, s.cursorColumn, 8, t);
+    rowY += ROW_HEIGHT;
+    const auto& amp = synth_amp(ins);
+    draw_dual_row(c, rowY, nameX, valueX, "ATK", hex2(amp.attack), "DEC",
+                  hex2(amp.decay), s.cursorRow, s.cursorColumn, 9, t);
+    rowY += ROW_HEIGHT;
+    draw_dual_row(c, rowY, nameX, valueX, "SUS", hex2(amp.sustain), "REL",
+                  hex2(amp.release), s.cursorRow, s.cursorColumn, 10, t);
+    rowY += ROW_HEIGHT;
+    draw_dual_row(c, rowY, nameX, valueX, "REV", hex2(ins.reverbSend), "DEL",
+                  hex2(ins.delaySend), s.cursorRow, s.cursorColumn, 11, t);
+    rowY += ROW_HEIGHT;
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 12, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -329,6 +377,7 @@ void InstrumentEditorModule::draw_type_load_row(Canvas& c, int x, int y, int nam
     switch (type) {
         case InstrumentType::SOUNDFONT: typeText = "soundfont"; break;
         case InstrumentType::EXTERNAL:  typeText = "external";  break;
+        case InstrumentType::SYNTH:     typeText = "synth";     break;
         case InstrumentType::SAMPLER:   break;
     }
 
@@ -426,6 +475,34 @@ static CursorContext midi_opt_context(int current, int max) {
 
 CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState& s) const {
     const Instrument& ins = s.instrument;
+
+    if (s.type() == InstrumentType::SYNTH && s.cursorRow >= 7) {
+        const int row = s.cursorRow, col = s.cursorColumn;
+        if (row == 7) {
+            if (col == 1) return cc::hex_byte(ins.synthWave, 0, 3);
+            if (col == 3) return cc::toggle_ternary(ins.filterType, filter_types());
+        }
+        if (row == 8) {
+            if (col == 1) return cc::hex_byte(ins.filterCut, 0, 255);
+            if (col == 3) return cc::hex_byte(ins.filterRes, 0, 255);
+        }
+        if (row == 9) {
+            if (col == 1) return cc::hex_byte(synth_amp(ins).attack, 0, 255, -1, false, false, false, 0);
+            if (col == 3) return cc::hex_byte(synth_amp(ins).decay, 0, 255, -1, false, false, false, 0);
+        }
+        if (row == 10) {
+            if (col == 1) return cc::hex_byte(synth_amp(ins).sustain, 0, 255, -1, false, false, false, 255);
+            if (col == 3) return cc::hex_byte(synth_amp(ins).release, 0, 255, -1, false, false, false, 6);
+        }
+        if (row == 11) {
+            if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255);
+            if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255);
+        }
+        if (row == 12 && col == 1)
+            return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
+                                ins.eqSlot >= 0, ins.eqSlot < 0);
+        return cc::none();
+    }
 
     if (s.is_external()) {
         const int row = s.cursorRow;
@@ -647,6 +724,14 @@ songcore::MapTarget InstrumentEditorModule::map_target(const InstrumentEditorSta
         return {};
     }
 
+    if (s.type() == InstrumentType::SYNTH && row >= 7) {
+        if (row == 8 && col == 1) return {MapDestId::INS_CUT, 0};
+        if (row == 8 && col == 3) return {MapDestId::INS_RES, 0};
+        if (row == 11 && col == 1) return {MapDestId::INS_REV, 0};
+        if (row == 11 && col == 3) return {MapDestId::INS_DLY, 0};
+        return {};
+    }
+
     const bool sf  = s.is_soundfont();
     const int  off = sf ? 1 : 0;   // the SoundFont's PATCH row pushes everything below it down
 
@@ -696,6 +781,41 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
 
     const auto b255 = [&](int& field) { if (isSet) field = clamp(v, 0, 255); };
     const auto b15  = [&](int& field) { if (isSet) field = clamp(v, 0, 15); };
+
+    if (ins.instrumentType == InstrumentType::SYNTH && row >= 7) {
+        if (row == 7) {
+            if (col == 1 && isSet) ins.synthWave = clamp(v, 0, 3);
+            if (col == 3 && isSet && v >= 0 && v < static_cast<int>(filter_types().size()))
+                ins.filterType = filter_types()[static_cast<size_t>(v)];
+        } else if (row == 8) {
+            if (col == 1) b255(ins.filterCut);
+            if (col == 3) b255(ins.filterRes);
+        } else if (row == 9 || row == 10) {
+            if (isSet && (col == 1 || col == 3)) {
+                if (ins.modSlots.empty()) ins.modSlots.resize(4);
+                auto& amp = ins.modSlots[0];
+                if (amp.type != songcore::ModType::ADSR || amp.dest != songcore::ModDest::VOLUME) {
+                    amp = songcore::ModSlot{};
+                    amp.type = songcore::ModType::ADSR;
+                    amp.dest = songcore::ModDest::VOLUME;
+                    amp.sustain = 255;
+                    amp.release = 6;
+                }
+                int& field = row == 9 ? (col == 1 ? amp.attack : amp.decay)
+                                      : (col == 1 ? amp.sustain : amp.release);
+                field = clamp(v, 0, 255);
+            }
+        } else if (row == 11) {
+            if (col == 1) b255(ins.reverbSend);
+            if (col == 3) b255(ins.delaySend);
+        } else if (row == 12 && col == 1) {
+            if (isSet) ins.eqSlot = clamp(v, 0, 127);
+            else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
+            else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;
+        }
+        r.modified = (action.type != ActionType::NONE);
+        return r;
+    }
 
     if (ins.instrumentType == InstrumentType::EXTERNAL) {
         // The three-state MIDI byte: SET writes it, DELETE clears to −1 ("send nothing"), INSERT lands

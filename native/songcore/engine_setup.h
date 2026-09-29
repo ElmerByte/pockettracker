@@ -29,6 +29,9 @@
 // be substituted in a host test without an interface or a virtual call.
 
 #include <cstdio>
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -43,6 +46,24 @@
 #include "wav_writer.h"   // read_cue_points — a WAV's slice boundaries live in its `cue ` chunk
 
 namespace songcore {
+
+// One cycle plus a duplicate endpoint for the sampler's linear interpolation. Generated on the
+// control thread at load/edit time; the audio callback only reads the installed sample buffer.
+template <typename Engine>
+bool load_synth_wave(Engine& engine, const Instrument& ins) {
+    constexpr int cycle = 1024;
+    std::array<float, cycle + 1> pcm{};
+    for (int i = 0; i <= cycle; ++i) {
+        const float phase = static_cast<float>(i % cycle) / cycle;
+        switch (ins.synthWave) {
+            case 1: pcm[i] = 1.0f - 4.0f * std::abs(phase - 0.5f); break;
+            case 2: pcm[i] = 2.0f * phase - 1.0f; break;
+            case 3: pcm[i] = phase < 0.5f ? 1.0f : -1.0f; break;
+            default: pcm[i] = std::sin(6.28318530718f * phase); break;
+        }
+    }
+    return engine.loadSample(ins.sampleId, pcm.data(), static_cast<int>(pcm.size()));
+}
 
 // ─── params: no I/O, idempotent ──────────────────────────────────────────────────────────────────
 
@@ -428,7 +449,8 @@ MediaLoadResult load_project_media(Engine& engine, Project& project,
     int sources = 0;
     for (const Instrument& ins : project.instruments) {
         if (ins.id < 0 || ins.id >= POOL_INSTRUMENTS) continue;
-        if ((ins.instrumentType == InstrumentType::SOUNDFONT && ins.soundfontPath.has_value()) ||
+        if (ins.instrumentType == InstrumentType::SYNTH ||
+            (ins.instrumentType == InstrumentType::SOUNDFONT && ins.soundfontPath.has_value()) ||
             ins.sampleFilePath.has_value())
             sources++;
     }
@@ -442,7 +464,11 @@ MediaLoadResult load_project_media(Engine& engine, Project& project,
     for (Instrument& ins : project.instruments) {
         if (ins.id < 0 || ins.id >= POOL_INSTRUMENTS) continue;
 
-        if (ins.instrumentType == InstrumentType::SOUNDFONT && ins.soundfontPath.has_value()) {
+        if (ins.instrumentType == InstrumentType::SYNTH) {
+            if (load_synth_wave(engine, ins)) result.loaded++;
+            else result.failed++;
+            loadedSoFar++;
+        } else if (ins.instrumentType == InstrumentType::SOUNDFONT && ins.soundfontPath.has_value()) {
             const std::string path = resolve_media_path(*ins.soundfontPath, base_dir, app_root);
             const auto span = slice();
             // The saved bank and preset are what gets loaded — a slot holds one sound, not the bank.
@@ -719,13 +745,26 @@ void set_instrument_type(Engine* engine, Project& project, int id, InstrumentTyp
                          Routing& routing) {
     if (id < 0 || id >= static_cast<int>(project.instruments.size())) return;
     Instrument& ins = project.instruments[id];
+    const InstrumentType oldType = ins.instrumentType;
     ins.instrumentType = newType;
+
+    if (newType == InstrumentType::SYNTH && ins.modSlots.empty()) ins.modSlots.resize(4);
+
+    if (newType == InstrumentType::SYNTH &&
+        std::all_of(ins.modSlots.begin(), ins.modSlots.end(),
+                    [](const ModSlot& slot) { return slot.type == ModType::NONE; })) {
+        // A looping oscillator needs a release envelope; the regular MODS screen can edit it.
+        ins.modSlots[0].type = ModType::ADSR;
+        ins.modSlots[0].dest = ModDest::VOLUME;
+        ins.modSlots[0].sustain = 255;
+        ins.modSlots[0].release = 6;
+    }
 
     // ⚠️ Two INDEPENDENT tests, not an if/else on "is it a SoundFont" — that shape was correct only
     // while there were exactly two types, and EXTERNAL (MIDI plan §7) owns NEITHER source, so it must
     // free BOTH. Written this way the two original types take byte-for-byte the same branches they
     // always did, and a fourth type gets the right answer by construction.
-    if (newType != InstrumentType::SAMPLER) {
+    if (newType != InstrumentType::SAMPLER || oldType == InstrumentType::SYNTH) {
         ins.sampleFilePath.reset();
         if (engine) engine->clearSample(id);
         routing.sampleRateRatio[id] = 1.0f;

@@ -516,6 +516,10 @@ class SongcoreHost {
     void push_instrument(int id) {
         if (!engine_) return;
         if (id < 0 || id >= static_cast<int>(project_.instruments.size())) return;
+        const Instrument& ins = project_.instruments[id];
+        if (ins.instrumentType == InstrumentType::SYNTH && synthWaveCache_[id] != ins.synthWave) {
+            if (load_synth_wave(*engine_, ins)) synthWaveCache_[id] = ins.synthWave;
+        }
         push_instrument_params(*engine_, project_.instruments[id], routing_, project_.tempo, sampleRate_);
         // ⚠️ `sampleId`, because that is the index the params were just written at — the engine keys
         // its per-instrument playback params by it, and a voice remembers the same number.
@@ -741,11 +745,13 @@ class SongcoreHost {
 
     void set_instrument_type(int id, InstrumentType type) {
         songcore::set_instrument_type(engine_, project_, id, type, routing_);
+        if (id >= 0 && id < POOL_INSTRUMENTS) synthWaveCache_[id] = -1;
         push_instrument(id);   // itself a no-op without an engine
     }
 
     void clear_instrument(int id) {
         songcore::clear_instrument(engine_, project_, id, routing_);
+        if (id >= 0 && id < POOL_INSTRUMENTS) synthWaveCache_[id] = -1;
         push_instrument(id);
     }
 
@@ -984,6 +990,7 @@ class SongcoreHost {
 
         const InstrumentPreset ip = parse_instrument_preset(j);
         const bool sourceOk = apply_instrument_preset(engine_, project_, id, ip, routing_, mediaRoots_);
+        if (id >= 0 && id < POOL_INSTRUMENTS) synthWaveCache_[id] = -1;
         invalidate_tables();   // the preset may have brought a table with it
         push_instrument(id);
         return sourceOk;
@@ -1741,6 +1748,7 @@ class SongcoreHost {
     // set_app_root() plus the last load_media(); both empty ⇒ no resolving at all (the tools' default)
     MediaRoots mediaRoots_;
     Routing routing_;
+    int synthWaveCache_[POOL_INSTRUMENTS] = {};
 
     /**
      * The RATE row's ratio cache (sample_edit.h). Editor-session state, not project state — it exists

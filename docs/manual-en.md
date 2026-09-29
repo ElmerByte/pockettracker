@@ -584,15 +584,19 @@ works stays lit even when its two halves are in different phrases of the same ch
 
 ## 10. INSTRUMENT Screen
 
-The INSTRUMENT screen configures how a sample or SF2 preset is played.
+The INSTRUMENT screen configures a sample, SF2 preset, or built-in synth.
 
 Navigate here with **R+RIGHT** from PHRASE. Use **B+LEFT/RIGHT** to switch between instruments without leaving the screen.
+
+### Built-in synth
+
+On the **TYPE** cell, hold **A** and press LEFT/RIGHT until it reads **synth**. No sound file is needed: press **START** to audition the instrument, or use it in a phrase. **WAVE** selects sine, triangle, saw, or square. The same ROOT, DETUNE, VOL, PAN, filter, sends, and EQ controls used by other instruments apply here. **ATK** (Attack), **DEC** (Decay), **SUS** (Sustain), and **REL** (Release) control the synth's volume envelope directly. ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level (`00` silent, `FF` full). These are the same values as the volume ADSR in MOD1. If MOD1 was changed to another type or destination, editing one of these cells restores it as the synth's volume ADSR. Open **MODS** with **R+UP** to edit the envelope further or add an LFO to pitch, volume, pan, or filter. A note-off starts the release; a hard kill cuts the note. High saw and square notes may sound bright or alias because this first version uses a single wavetable per waveform.
 
 ### WAV instrument parameters
 
 | Parameter | Range | Description |
 |---|---|---|
-| TYPE | — | The instrument kind, with two buttons to the right of its value. **LOAD** opens the file browser; **EDIT >** opens the SAMPLE EDITOR. Press **A** on either. ⚠️ **EDIT >** is not drawn on a SoundFont — there is no single waveform to edit — and an EXTERNAL instrument has neither button. |
+| TYPE | — | The instrument kind. **LOAD** opens the file browser; **EDIT >** opens the SAMPLE EDITOR. Press **A** on either. SoundFont has no **EDIT >** button; SYNTH and EXTERNAL have neither source button. |
 | NAME | — | Instrument name. Press A to edit it on the keyboard overlay. |
 | ROOT | C-0 – G-9 | The pitch of the sample as recorded. |
 | DETUNE | 00–FF | Fine tuning. `80` = center (no detune). |
