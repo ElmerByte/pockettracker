@@ -2,7 +2,7 @@
 
 // ───────────────────────────────────────────────────────────────────────────
 // DragonflyReverb — the Dragonfly Reverb suite's four plugins, run as the reverb send's algorithms
-// 1..6: HALL, ROOM, PLATE (Dragonfly's "Nested"), FOIL ("Simple"), TANK and EARLY.
+// 1..4: HALL, ROOM, PLATE (Dragonfly's "Nested") and FOIL ("Simple").
 //
 // Each is Dragonfly's own `plugins/*/DSP.cpp` set-up and signal flow over the freeverb3 subset in
 // `freeverb/`, with the plugin's parameter surface replaced by the reverb section's cells. The
@@ -10,7 +10,7 @@
 //
 // ⚠️⚠️ **FREEVERB REALLOCATES ITS DELAY LINES WHEN A ROOM'S SIZE OR THE RATE CHANGES** (`setRSFactor`,
 // `setSampleRate`, `loadPresetReflection`), so the audio thread never does either. `prepare` — the
-// control thread, whenever the algorithm, SIZE, EARLY's program or the rate changes — builds a whole
+// control thread, whenever the algorithm, SIZE or the rate changes — builds a whole
 // engine at those values and hands it over; `process` takes it at its next block and parks the one it
 // replaced for the next `prepare` to free. The other cells are applied to the running engine inside
 // `process`, which allocates nothing. A new engine starts silent, as freeverb's own resize did.
@@ -37,7 +37,7 @@ class DragonflyReverb {
     void setCells(int decayHex, int sizeHex, int dampHex, int modHex);
 
     /**
-     * Make sure the engine for `algo` is built at this SIZE, program and rate, building it here if not.
+     * Make sure the engine for `algo` is built at this SIZE and rate, building it here if not.
      * The control thread only (the UI, or a render while the device is paused) — this allocates.
      */
     void prepare(int algo, int decayHex, int sizeHex, int dampHex, int modHex, float sampleRate);
@@ -46,7 +46,7 @@ class DragonflyReverb {
     void requestClear();
 
     /**
-     * Stereo in, stereo wet out, `algo` 1..6. Audio thread only; silent until `prepare` has built
+     * Stereo in, stereo wet out, `algo` 1..4. Audio thread only; silent until `prepare` has built
      * the algorithm.
      * ⚠️ `switched` must be true on the first block after the send was sounding a DIFFERENT algorithm:
      * an engine that sat idle still holds the tail it had when it stopped, and would replay it.

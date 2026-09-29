@@ -79,14 +79,10 @@ inline constexpr int kReverbAlgoHall  = 1;   // Dragonfly Hall — every cell
 inline constexpr int kReverbAlgoRoom  = 2;   // Dragonfly Room — every cell
 inline constexpr int kReverbAlgoPlate = 3;   // Dragonfly Plate, "Nested" — SIZE and MOD read nothing
 inline constexpr int kReverbAlgoFoil  = 4;   // Dragonfly Plate, "Simple" — SIZE and MOD read nothing
-inline constexpr int kReverbAlgoTank  = 5;   // Dragonfly Plate, "Tank" — SIZE and MOD read nothing
-inline constexpr int kReverbAlgoEarly = 6;   // Dragonfly Early Reflections — DCAY reads nothing,
-                                             // MOD picks one of eight reflection programs
-inline constexpr int kReverbAlgoCount = 7;
+inline constexpr int kReverbAlgoCount = 5;
 
 inline const char* reverb_algo_name(int algo) {
-    static constexpr const char* kNames[kReverbAlgoCount] = {"OLD",  "HALL", "ROOM", "PLATE",
-                                                             "FOIL", "TANK", "EARLY"};
+    static constexpr const char* kNames[kReverbAlgoCount] = {"OLD", "HALL", "ROOM", "PLATE", "FOIL"};
     return (algo >= 0 && algo < kReverbAlgoCount) ? kNames[algo] : kNames[0];
 }
 

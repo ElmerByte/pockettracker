@@ -2162,7 +2162,7 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
     /* SE_BIT */
     {"BIT: bits per sample", "The file depth, or lower for", "grit. SAVE writes at this depth."},
     /* FX_REVERB_ALGO */
-    {"ALGO: which reverb", "OLD, or a Dragonfly HALL, ROOM,", "PLATE, FOIL, TANK or EARLY."},
+    {"ALGO: which reverb", "OLD, or a Dragonfly HALL, ROOM,", "PLATE or FOIL."},
     /* SET_HELP */
     {"HELP: what SELECT shows", "SHORT uses the top strip, FULL", "a big page. OFF shows nothing."},
     /* GROOVE_NAME */

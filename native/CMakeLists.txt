@@ -233,7 +233,7 @@ set(ENGINE_CORE_SOURCES
         effects/primitives/daisysp/crossfade.cpp
         effects/primitives/daisysp/balance.cpp
         effects/primitives/daisysp/reverbsc.cpp
-        # The Dragonfly Reverb algorithms (reverb ALGO 1..6) and the freeverb3 subset they run on.
+        # The Dragonfly Reverb algorithms (reverb ALGO 1..4) and the freeverb3 subset they run on.
         effects/primitives/dragonfly/dragonfly-reverb.cpp
         effects/primitives/dragonfly/freeverb/allpass.cpp
         effects/primitives/dragonfly/freeverb/biquad.cpp
@@ -248,7 +248,6 @@ set(ENGINE_CORE_SOURCES
         effects/primitives/dragonfly/freeverb/progenitor2.cpp
         effects/primitives/dragonfly/freeverb/revbase.cpp
         effects/primitives/dragonfly/freeverb/slot.cpp
-        effects/primitives/dragonfly/freeverb/strev.cpp
         effects/primitives/dragonfly/freeverb/utils.cpp
         effects/primitives/dragonfly/freeverb/zrev.cpp
         effects/primitives/dragonfly/freeverb/zrev2.cpp

@@ -21,7 +21,6 @@
 #include "freeverb/nrev.hpp"
 #include "freeverb/nrevb.hpp"
 #include "freeverb/progenitor2.hpp"
-#include "freeverb/strev.hpp"
 #include "freeverb/zrev2.hpp"
 
 namespace {
@@ -233,25 +232,23 @@ struct RoomEngine final : Engine {
     }
 };
 
-// PLATE / FOIL / TANK — input filters into one of the Plate plugin's three models. Fixed values:
-// "Clear Plate" (low cut 100 Hz).
-//   DCAY RT60 · DAMP the model's damping, or the input high cut where the model has none · SIZE and
-//   MOD read nothing
+// PLATE / FOIL — input filters into one of the Plate plugin's models. Fixed values: "Clear Plate"
+// (low cut 100 Hz).
+//   DCAY RT60 · DAMP the input high cut · SIZE and MOD read nothing
 //
 // ⚠️⚠️ **DRAGONFLY'S OWN DAMPEN KNOB DOES NOTHING ON ITS "SIMPLE" AND "NESTED" MODELS.** The plugin
 // overrides a `processloop2` that this copy of freeverb's `nrev` never calls — `processreplace` runs
 // its own loop inline — so the damping filters it sets are never in the signal path, and "Nested"
 // runs the "Simple" loop too. What those two DO respond to is the INPUT high cut, so that is what DAMP
-// drives there. TANK has a real damping stage and DAMP drives it, as the plugin does.
+// drives.
 template <class Model>
 struct PlateEngine final : Engine {
     fv3::iir_1st_f lpf[2], hpf[2];
     Model          model;
-    bool           dampIsInputCut;
     double         sampleRate = 48000.0;
     double         inputCutHz = 16000.0;
 
-    explicit PlateEngine(bool tank) : dampIsInputCut(!tank) {
+    PlateEngine() {
         for (auto& f : lpf) f.mute();
         for (auto& f : hpf) f.mute();
         model.setdryr(0);
@@ -274,70 +271,15 @@ struct PlateEngine final : Engine {
     void apply(const Cells& c) override {
         if (c.decay != applied.decay) model.setrt60(decay_seconds(c.decay));
         if (c.damp != applied.damp) {
-            if (dampIsInputCut) {
-                inputCutHz = damp_hz(c.damp);
-                for (auto& f : lpf) f.setLPF_BW(inputCutHz, sampleRate);
-            } else {
-                setModelDamp(damp_hz(c.damp));
-            }
+            inputCutHz = damp_hz(c.damp);
+            for (auto& f : lpf) f.setLPF_BW(inputCutHz, sampleRate);
         }
     }
-    void setModelDamp(double) {}
     void run(float* inL, float* inR, float* outL, float* outR, long n) override {
         for (long i = 0; i < n; i++) {
             inL[i] = lpf[0].process(hpf[0].process(inL[i]));
             inR[i] = lpf[1].process(hpf[1].process(inR[i]));
         }
-        model.processreplace(inL, inR, outL, outR, n);
-        for (long i = 0; i < n; i++) {
-            outL[i] *= 0.2f;
-            outR[i] *= 0.2f;
-        }
-    }
-};
-
-template <>
-void PlateEngine<fv3::strev_f>::setModelDamp(double hz) {
-    model.setdamp(hz);
-    model.setoutputdamp(std::max(hz * 2.0, 16000.0));
-}
-
-// ⚠️ TANK's modulation noise (freeverb's `noisegen_pink_frac`) calls `std::rand` per sample: a render
-// on TANK is never byte-reproducible, and on glibc `rand` takes a lock on the audio thread.
-std::unique_ptr<Engine> make_tank() {
-    auto e = std::make_unique<PlateEngine<fv3::strev_f>>(true);
-    e->model.setdccutfreq(6);
-    e->model.setspinlimit(12);
-    e->model.setspindiff(0.15);
-    return e;
-}
-
-// EARLY — earlyref alone. Fixed values: the plugin's defaults (low cut 50 Hz).
-//   SIZE 10-60 m · DAMP high cut · MOD which of the eight reflection programs · DCAY reads nothing
-struct EarlyEngine final : Engine {
-    // The plugin's eight programs, in its order, as freeverb's preset numbers.
-    static constexpr int kPrograms[8] = {2, 18, 0, 19, 1, 13, 14, 21};
-
-    EarlyRef        model;
-    int             program = -1;
-
-    EarlyEngine() {
-        early_setup(model);
-        model.setwidth(1.0);
-        model.setoutputhpf(50.0);
-    }
-    void setRate(double sr) override { model.setSampleRate(sr); }
-    void mute() override { model.mute(); }
-    void apply(const Cells& c) override {
-        const int prog = std::min(7, c.mod / 32);
-        if (prog != program) {
-            model.loadPresetReflection(kPrograms[prog]);
-            program = prog;
-        }
-        if (c.size != applied.size) model.setRSFactor(size_m(c.size, 10.0, 60.0) / 10.0);
-        if (c.damp != applied.damp) model.setoutputlpf(damp_hz(c.damp));
-    }
-    void run(float* inL, float* inR, float* outL, float* outR, long n) override {
         model.processreplace(inL, inR, outL, outR, n);
         for (long i = 0; i < n; i++) {
             outL[i] *= 0.2f;
@@ -352,17 +294,15 @@ struct EarlyEngine final : Engine {
  * ⚠️ Measured on noise at the default cells against the shipping reverb's wet level — a DCAY or SIZE
  * away from the defaults moves these engines' level, which nothing here compensates.
  */
-//                                           OLD   HALL   ROOM   PLATE  FOIL   TANK   EARLY
-constexpr float kTrim[kReverbAlgoCount] = {1.0f, 2.22f, 4.62f, 3.63f, 2.26f, 1.72f, 1.74f};
+//                                           OLD   HALL   ROOM   PLATE  FOIL
+constexpr float kTrim[kReverbAlgoCount] = {1.0f, 2.22f, 4.62f, 3.63f, 2.26f};
 
 std::unique_ptr<Engine> make_engine(int algo) {
     switch (algo) {
         case kReverbAlgoHall:  return std::make_unique<HallEngine>();
         case kReverbAlgoRoom:  return std::make_unique<RoomEngine>();
-        case kReverbAlgoPlate: return std::make_unique<PlateEngine<fv3::nrevb_f>>(false);
-        case kReverbAlgoFoil:  return std::make_unique<PlateEngine<fv3::nrev_f>>(false);
-        case kReverbAlgoTank:  return make_tank();
-        case kReverbAlgoEarly: return std::make_unique<EarlyEngine>();
+        case kReverbAlgoPlate: return std::make_unique<PlateEngine<fv3::nrevb_f>>();
+        case kReverbAlgoFoil:  return std::make_unique<PlateEngine<fv3::nrev_f>>();
         default:               return nullptr;
     }
 }
@@ -385,9 +325,9 @@ struct DragonflyReverb::Impl {
     // The control thread's own record of what it last handed over for each algorithm — everything
     // an engine has to be REBUILT for. The other cells are applied to a running engine.
     struct Key {
-        int   size = -1, program = -1;
+        int   size = -1;
         float rate = 0.0f;
-        bool operator==(const Key& o) const { return size == o.size && program == o.program && rate == o.rate; }
+        bool operator==(const Key& o) const { return size == o.size && rate == o.rate; }
     };
     Key built[kReverbAlgoCount];
 
@@ -409,16 +349,13 @@ void DragonflyReverb::setCells(int decayHex, int sizeHex, int dampHex, int modHe
 
 void DragonflyReverb::requestClear() { impl->clearRequested.store(true, std::memory_order_relaxed); }
 
-// EARLY's MOD picks a reflection program, and loading one allocates — so for EARLY it is a rebuild.
-static int early_program(int modHex) { return std::min(7, modHex / 32); }
-
 void DragonflyReverb::prepare(int algo, int decayHex, int sizeHex, int dampHex, int modHex,
                               float sampleRate) {
     Impl& m = *impl;
     for (auto& r : m.retired) delete r.exchange(nullptr, std::memory_order_acquire);
     if (algo <= 0 || algo >= kReverbAlgoCount) return;
 
-    const Impl::Key want{sizeHex, algo == kReverbAlgoEarly ? early_program(modHex) : -1, sampleRate};
+    const Impl::Key want{sizeHex, sampleRate};
     if (m.built[algo] == want) return;
 
     std::unique_ptr<Engine> e = make_engine(algo);
@@ -467,12 +404,10 @@ void DragonflyReverb::process(int algo, bool switched, const float* inL, const f
     const bool clear = m.clearRequested.exchange(false, std::memory_order_relaxed);
     if (switched || clear) e.mute();
 
-    // The cells a running engine can take without allocating. SIZE (and EARLY's program) are left
-    // as the engine was built: a change to them arrives as a new engine from `prepare`.
-    Cells want{m.decay.load(std::memory_order_relaxed), e.applied.size,
-               m.damp.load(std::memory_order_relaxed), m.mod.load(std::memory_order_relaxed)};
-    if (algo == kReverbAlgoEarly && early_program(want.mod) != early_program(e.applied.mod))
-        want.mod = e.applied.mod;
+    // The cells a running engine can take without allocating. SIZE is left as the engine was built:
+    // a change to it arrives as a new engine from `prepare`.
+    const Cells want{m.decay.load(std::memory_order_relaxed), e.applied.size,
+                     m.damp.load(std::memory_order_relaxed), m.mod.load(std::memory_order_relaxed)};
     if (want.decay != e.applied.decay || want.damp != e.applied.damp || want.mod != e.applied.mod) {
         e.apply(want);
         e.applied = want;

@@ -160,9 +160,7 @@ void EffectModule::draw(Canvas& c, int x, int y, const EffectState& s) const {
     param("DAMP", ROW_REV_DAMP, hex2(p.reverbDamp));
 
     eq_param(ROW_REV_EQ, p.reverbInputEq);
-    // ⚠️ The one label here that depends on another cell: EARLY has no modulation, and reads this
-    // byte as which of its eight reflection programs plays.
-    param(p.reverbAlgo == kReverbAlgoEarly ? "PROG" : "MOD", ROW_REV_MOD, hex2(p.reverbMod));
+    param("MOD",  ROW_REV_MOD,  hex2(p.reverbMod));
 
     // ── Delay ────────────────────────────────────────────────────────────────────────────────────
     header("DELAY", EffectsSection::DELAY);
