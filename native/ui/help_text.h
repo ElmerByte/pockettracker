@@ -1635,7 +1635,8 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "controllers let you set it, and",
       "most print it on the knob."},
      {"A+←/→ steps 1",
-      "A+↑/↓ steps 16"}},
+      "A+↑/↓ steps 16",
+      "A+B removes this line"}},
     /* MAP_MIN */
     {"MIN: the low end", "Where the knob puts the", "control turned all the way down.",
      {"The value the control takes at",
@@ -1674,7 +1675,8 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "It is fixed here, so moving the",
       "cursor later changes nothing."},
      {"A+←/→ steps 1",
-      "A+↑/↓ steps 16"}},
+      "A+↑/↓ steps 16",
+      "A+B removes this line"}},
     /* MAP_ADD */
     {"ADD: a new knob", "A adds a line, then set", "the CC and what it moves.",
      {"Adds a line to the list. It",

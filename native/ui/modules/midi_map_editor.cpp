@@ -178,51 +178,47 @@ CursorContext MidiMapModule::cursor_context(const MidiMapState& s) const {
     if (m == nullptr) return cc::read_only();   // the ADD row — plain A is its whole behaviour
 
     const MapDest* d = songcore::map_dest(m->dest);
+    const auto col   = static_cast<MapCol>(s.cursorColumn);
 
-    switch (static_cast<MapCol>(s.cursorColumn)) {
-        case MapCol::CC:
-            // ⚠️ 0..127 AND NOT 0..255: a controller number is seven bits on the wire, so a cell that
-            // dialled past 127 would be dialling a knob no cable can send.
-            return cc::hex_byte(m->controller, 0, 127);
+    const auto cell = [&]() -> CursorContext {
+        switch (col) {
+            case MapCol::CC:
+                // ⚠️ 0..127 AND NOT 0..255: a controller number is seven bits on the wire, so a cell that
+                // dialled past 127 would be dialling a knob no cable can send.
+                return cc::hex_byte(m->controller, 0, 127);
 
-        // ⚠️ THE RANGE IS BOUNDED BY THE DESTINATION'S OWN RANGE, never by 0..FF — a crush is 0..F,
-        // and a range dialled to 0x80 on it would mean nothing. A+B puts the bound back.
-        case MapCol::MIN:
-            if (!d) return cc::read_only();
-            return cc::hex_byte(m->rangeMin, d->min, d->max, /*empty_value=*/-1,
-                                /*can_delete=*/false, /*can_insert=*/false, /*can_create=*/false,
-                                /*def=*/d->min);
-        case MapCol::MAX:
-            if (!d) return cc::read_only();
-            return cc::hex_byte(m->rangeMax, d->min, d->max, /*empty_value=*/-1,
-                                /*can_delete=*/false, /*can_insert=*/false, /*can_create=*/false,
-                                /*def=*/d->max);
+            // ⚠️ THE RANGE IS BOUNDED BY THE DESTINATION'S OWN RANGE, never by 0..FF — a crush is 0..F,
+            // and a range dialled to 0x80 on it would mean nothing. A+B puts the bound back.
+            case MapCol::MIN:
+                if (!d) return cc::read_only();
+                return cc::hex_byte(m->rangeMin, d->min, d->max, /*empty_value=*/-1,
+                                    /*can_delete=*/false, /*can_insert=*/false, /*can_create=*/false,
+                                    /*def=*/d->min);
+            case MapCol::MAX:
+                if (!d) return cc::read_only();
+                return cc::hex_byte(m->rangeMax, d->min, d->max, /*empty_value=*/-1,
+                                    /*can_delete=*/false, /*can_insert=*/false, /*can_create=*/false,
+                                    /*def=*/d->max);
 
-        // ⚠️ **A+B ON EITHER DESTINATION CELL DELETES THE WHOLE MAPPING**, which is why they carry the
-        // delete and CC and the range rows do not. A mapping with no destination is not a thing the
-        // song can hold — clearing the destination IS removing the row — and hanging the gesture on
-        // the range cells instead would make "put this range back" and "throw this mapping away" the
-        // same press.
-        case MapCol::GROUP: {
-            CursorContext c = cc::enum_cycle(d ? static_cast<int>(d->group) : 0,
-                                             songcore::MAP_GROUP_COUNT);
-            c.capabilities.canDelete = true;
-            return c;
+            case MapCol::GROUP:
+                return cc::enum_cycle(d ? static_cast<int>(d->group) : 0, songcore::MAP_GROUP_COUNT);
+
+            case MapCol::PARAM:
+                if (!d) return cc::read_only();
+                return cc::enum_cycle(songcore::map_index_in_group(d->id), songcore::map_group_size(d->group));
+
+            case MapCol::SCOPE:
+                if (!d || !map_scope_editable(d->scope)) return cc::read_only();
+                return cc::hex_byte(m->scopeIndex, 0, scope_max(s.project, d->scope));
         }
+        return cc::none();
+    };
 
-        case MapCol::PARAM: {
-            if (!d) return cc::read_only();
-            CursorContext c = cc::enum_cycle(songcore::map_index_in_group(d->id),
-                                             songcore::map_group_size(d->group));
-            c.capabilities.canDelete = true;
-            return c;
-        }
-
-        case MapCol::SCOPE:
-            if (!d || !map_scope_editable(d->scope)) return cc::read_only();
-            return cc::hex_byte(m->scopeIndex, 0, scope_max(s.project, d->scope));
-    }
-    return cc::none();
+    // ⚠️ A+B DELETES THE WHOLE MAPPING FROM EVERY CELL BUT MIN AND MAX — there it puts the bound back
+    // to the destination's own end, and one press must not mean both.
+    CursorContext c = cell();
+    if (col != MapCol::MIN && col != MapCol::MAX) c.capabilities.canDelete = true;
+    return c;
 }
 
 // ─── Input ───────────────────────────────────────────────────────────────────────────────────────
@@ -242,9 +238,17 @@ MidiMapInputResult MidiMapModule::handle_input(songcore::Project& project, int c
     // of one function rather than three copies of four lines.
     const auto take_dest = [&](const MapDest& nd) { return songcore::take_dest(m, nd); };
 
+    const auto col = static_cast<MapCol>(cursor_column);
+    if (action.type == ActionType::DELETE && col != MapCol::MIN && col != MapCol::MAX) {
+        project.midiMappings.erase(project.midiMappings.begin() + cursor_row);
+        r.modified   = true;
+        r.rowDeleted = true;
+        return r;
+    }
+
     const bool isSet = (action.type == ActionType::SET_VALUE);
 
-    switch (static_cast<MapCol>(cursor_column)) {
+    switch (col) {
         case MapCol::CC:
             if (!isSet) break;
             m.controller = static_cast<uint8_t>(clamp(action.value, 0, 127));
@@ -265,12 +269,6 @@ MidiMapInputResult MidiMapModule::handle_input(songcore::Project& project, int c
 
         case MapCol::GROUP:
         case MapCol::PARAM: {
-            if (action.type == ActionType::DELETE) {
-                project.midiMappings.erase(project.midiMappings.begin() + cursor_row);
-                r.modified   = true;
-                r.rowDeleted = true;
-                break;
-            }
             if (!isSet || !d) break;
 
             if (static_cast<MapCol>(cursor_column) == MapCol::GROUP) {
