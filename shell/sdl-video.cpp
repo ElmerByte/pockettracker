@@ -463,8 +463,8 @@ bool SdlVideo::present_impl(const Canvas& canvas, uint32_t clearArgb, const SDL_
     SDL_RenderCopy(renderer_, texture_, nullptr, &dest);
 
     // ⚠️ The overlay goes HERE — after the frame, before the flip — drawn OVER it: the landscape touch
-    // panels in the bars beside the frame, or PORTRAIT2's button cluster on its backing. Never onto the
-    // 640×480 tracker itself. Empty on any layout with no on-screen controls, and then this does nothing.
+    // panels in the bars beside the frame, or PORTRAIT2's buttons and transparent-skin header. The
+    // header uses the tracker's empty top margin. Empty on layouts with no on-screen controls.
     if (overlay) overlay(renderer_);
 
     SDL_RenderPresent(renderer_);

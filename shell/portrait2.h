@@ -23,10 +23,11 @@
 //
 // The above is the CHROME art (amiga / amiga-2). The TRANSPARENT skin is drawn by this same class from
 // a different starting point: `portrait2_skin_bare` instead of `portrait2_skin`, so there are no bands
-// at all — just the tracker across the FULL device width and the button cluster below it. Its art is
-// the bare square and wide shapes, tinted at blit time to the live tracker theme, so two colours reach
+// at all — just the tracker across the FULL device width, a small header over its unused top margin,
+// and the button cluster below it. Its art is the bare square and wide shapes plus the header logo,
+// tinted at blit time to the live tracker theme, so two colours reach
 // the screen: the theme's background, which is the casing clear, and its TXT VALUE, which is every key
-// and the same labels the chrome skins draw.
+// and its Hurmit Nerd Font labels and symbols.
 //
 //   ┌───────────────┐  the tracker — full device width, no bezel, no border
 //   │    640×480    │
@@ -156,7 +157,7 @@ public:
      *  fill, which would only repaint the casing colour over itself. Its ground is the casing clear. */
     void draw_chrome(SDL_Renderer* r, const Skin& skin, uint32_t innerBezelArgb) const;
 
-    /** OVERLAY (drawn AFTER the frame): the ten buttons on the backing band, each in its PNG variant
+    /** OVERLAY (drawn AFTER the frame): the TRNS header and ten buttons, each in its PNG variant
      *  (wide L/R, dark A/B, plain square for the rest; pressed when held) with its label. LETTERS come
      *  from `font` (Helvetica) via `draw_text`; the D-pad ARROWS come from `arrowFont` (Linux Biolinum)
      *  via `draw_text` too — a real glyph, because Helvetica ships no arrows — falling back to `font`'s
@@ -164,10 +165,9 @@ public:
      *  textures on first use. If `font` itself did not load, the whole cluster falls back to the 5×5
      *  label font, so a missing .otf shows blocky labels rather than none.
      *
-     *  The TRANSPARENT skin takes the same path, with the blit tinted and the label drawn in the
-     *  theme's TXT VALUE rather than the skin table's constant. */
-    void draw_buttons(SDL_Renderer* r, const Skin& skin, Font& font, Font& arrowFont,
-                      const SdlInput& input) const;
+     *  The TRANSPARENT skin tints the blit and draws its Hurmit labels in the theme's TXT VALUE. */
+    void draw_buttons(SDL_Renderer* r, const Skin& skin, Font& font, Font& arrowFont, Font& hermitFont,
+                      const SdlInput& input, bool playing, bool dirty, const float peaks[2]) const;
 
     /**
      * A fingerprint of what this layout would draw, for `SdlVideo`'s C7 pixel gate — the held buttons

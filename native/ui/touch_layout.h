@@ -531,8 +531,8 @@ inline Portrait2Skin portrait2_skin(int deviceW, int deviceH, float density,
 
 // ─── PORTRAIT2 BARE: the same cluster, no chrome, and the screen gets the rest ────────────────────
 //
-// The band geometry for a skin that ships BUTTON ART ONLY — no vent panel, no branding strip, no
-// button backing and no bezel. Two bands instead of four:
+// The band geometry for a skin with button art and an overlaid header logo — no vent panel, branding
+// strip, button backing or bezel. Two bands instead of four:
 //
 //     ┌───────────────┐  the SCREEN area — FULL DEVICE WIDTH, no border, the frame centred in it
 //     │               │

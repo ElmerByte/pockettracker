@@ -40,8 +40,8 @@ struct DeviceSkinDef {
 //
 // ⚠️ TRNS is not another set of chrome art. Anything but `SkinArt::Chrome` turns three things over at
 // once:
-//   * the ART is the generic square/wide SHAPE alone, with the usual label drawn on top;
-//   * the LAYOUT is `portrait2_skin_bare` — no panels, no branding, no backing, no bezel, so the
+//   * the ART is the generic square/wide SHAPE and a tintable header logo;
+//   * the LAYOUT is `portrait2_skin_bare` — no panels, no backing, no bezel, so the
 //     tracker gets the full device width;
 //   * the COLOURS are the LIVE tracker theme's (background behind, TXT VALUE for the keys and their
 //     labels), not the two constants below — which is why its `casingFillArgb`/`labelRgb` are left

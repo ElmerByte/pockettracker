@@ -551,6 +551,10 @@ int run(const AppConfig& cfg) {
     Font arrowFont;
     if (cfg.touchCapable) arrowFont.load(video.renderer(), "fonts/LinBiolinum_Rah.ttf", cfg.console);
 
+    Font hermitFont;
+    if (cfg.touchCapable)
+        hermitFont.load(video.renderer(), "fonts/HurmitNerdFontPropo-Regular.otf", cfg.console);
+
     // ── The screen overlay (convergence D6): the CRT filter drawn OVER the frame ─────────────────
     //
     // One texture, decoded through the same D7 asset seam / D2 decoder as the skin, owned by the
@@ -813,10 +817,14 @@ int run(const AppConfig& cfg) {
             const auto chrome = [&portrait, &skin, bg](SDL_Renderer* r) {
                 portrait.draw_chrome(r, skin, bg);
             };
-            const auto buttons = [&portrait, &skin, &helvFont, &arrowFont, &input,
-                                  &screenOverlay, ovOn, ovStr](SDL_Renderer* r) {
+            float statusPeaks[2] = {};
+            if (state.isPlaying) engineRef.getMasterPeaks(statusPeaks);
+            const bool dirty = state.project_dirty();
+            const auto buttons = [&portrait, &skin, &helvFont, &arrowFont, &hermitFont, &input,
+                                  &screenOverlay, &statusPeaks, ovOn, ovStr, &state, dirty](SDL_Renderer* r) {
                 if (ovOn) screenOverlay.draw(r, portrait.frame_rect(), ovStr);
-                portrait.draw_buttons(r, skin, helvFont, arrowFont, input);
+                portrait.draw_buttons(r, skin, helvFont, arrowFont, hermitFont, input,
+                                      state.isPlaying, dirty, statusPeaks);
             };
             // ⚠️ B4 scrims ONLY the bezel's inner GLASS on PORTRAIT2, never the casing or the button
             // cluster: dimming those would make the whole skin go dark around a bright cluster, which
@@ -825,8 +833,12 @@ int run(const AppConfig& cfg) {
             // leaves the frame smaller than the glass (screen_rect()). FIT fills the glass, so the gap —
             // and therefore this scrim — is empty there. Off entirely when no full-canvas modal is up.
             const uint32_t scrim = ui::modal_backdrop_active(state) ? ui::MODAL_BACKDROP : 0;
+            const uint64_t meterSig = static_cast<uint64_t>(std::clamp(statusPeaks[0], 0.0f, 1.0f) * 7) |
+                                      (static_cast<uint64_t>(std::clamp(statusPeaks[1], 0.0f, 1.0f) * 7) << 3);
             return video.present_skinned(canvas, portrait.casing_argb(), portrait.frame_rect(),
-                                         chrome, buttons, portrait.signature(input) ^ crtSig, scrim,
+                                         chrome, buttons,
+                                         portrait.signature(input) ^ crtSig ^ (meterSig << 10) ^
+                                         (static_cast<uint64_t>(dirty) << 61), scrim,
                                          portrait.screen_rect());
         }
         // Landscape / desktop: the centred frame, the LEFT/RIGHT touch panels in the bars beside it —
@@ -2050,6 +2062,7 @@ int run(const AppConfig& cfg) {
     audio.closeStream();
     input.close_controllers();
     arrowFont.unload();  // ⚠️ same reason as skin/helvFont: glyph textures belong to the renderer
+    hermitFont.unload();
     helvFont.unload();  // ⚠️ same reason as skin: its glyph textures belong to the renderer being destroyed
     skin.unload();   // ⚠️ before video.close(): the skin's textures belong to the renderer it destroys
     screenOverlay.unload();  // ⚠️ same reason: the CRT overlay's texture belongs to that renderer

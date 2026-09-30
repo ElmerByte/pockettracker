@@ -31,9 +31,9 @@ namespace ptshell {
 //   Chrome       — the four background bands plus the generic button shapes, in the skin's own
 //                  colours; the button CHARACTERS are drawn over them in a font by the renderer.
 //                  `amiga` and `amiga-2`.
-//   Transparent  — the generic button SHAPES alone, authored as white ink on transparent, and no
-//                  background art: the shapes are tinted to the live theme and the characters are
-//                  drawn over them in a font, in that same colour. `amiga-transparent`.
+//   Transparent  — button shapes and header logo authored as white ink on transparent, with no
+//                  background art: they tint to the live theme, as do the font labels.
+//                  `amiga-transparent`.
 enum class SkinArt : uint8_t { Chrome, Transparent };
 
 // The pieces a theme ships, one enumerator per PNG file (the names mirror the filenames under
@@ -55,6 +55,7 @@ enum class SkinPiece {
     BtnSquarePressedDark,  // btn_square_pressed_dark.png
     BtnWideNormal,         // btn_wide_normal.png
     BtnWidePressed,        // btn_wide_pressed.png
+    Logo,                  // logo.png (transparent skin header)
     COUNT
 };
 

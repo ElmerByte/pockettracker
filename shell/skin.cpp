@@ -37,6 +37,7 @@ constexpr SkinFile kFiles[] = {
     {"btn_square_pressed_dark.png",kC     },  // BtnSquarePressedDark
     {"btn_wide_normal.png",        kC | kT},  // BtnWideNormal
     {"btn_wide_pressed.png",       kC | kT},  // BtnWidePressed
+    {"logo.png",                   kT     },  // Logo — mirrored white export of docs/images/florktracker.svg
 };
 static_assert(sizeof(kFiles) / sizeof(kFiles[0]) == static_cast<int>(SkinPiece::COUNT),
               "kFiles must have one entry per SkinPiece");
