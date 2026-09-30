@@ -373,6 +373,10 @@ void InputDispatcher::on_button_b() {
 }
 
 void InputDispatcher::sequence_history(bool redo) {
+#ifndef NDEBUG
+    std::printf("history: %s requested, screen=%d overlay=%u\n", redo ? "redo" : "undo",
+                static_cast<int>(s_.currentScreen), static_cast<unsigned>(top_overlay()));
+#endif
     if (overlay_swallows(Overlay::NONE)) return;
     if (s_.currentScreen != ScreenType::PHRASE && s_.currentScreen != ScreenType::CHAIN &&
         s_.currentScreen != ScreenType::SONG) return;
@@ -382,6 +386,9 @@ void InputDispatcher::sequence_history(bool redo) {
     const bool changed = redo ? sequenceUndo_.redo(p, position) : sequenceUndo_.undo(p, position);
     s_.statusMessage = changed ? (redo ? "REDO" : "UNDO") : (redo ? "NO REDO" : "NO UNDO");
     s_.statusSuccess = changed;
+#ifndef NDEBUG
+    std::printf("history: %s\n", s_.statusMessage.c_str());
+#endif
     if (!changed) return;
     s_.currentScreen = position.screen;
     s_.currentPhrase = position.phrase;

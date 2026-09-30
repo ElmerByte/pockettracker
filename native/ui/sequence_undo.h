@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <cstdio>
 #include <optional>
 #include <tuple>
 #include <utility>
@@ -109,6 +110,9 @@ class SequenceUndo {
         else undo_.clear();
         redo_.clear();
         baseline_ = std::move(current);
+#ifndef NDEBUG
+        if (gridEdit) std::printf("history: recorded edit (%zu undo steps)\n", undo_.size());
+#endif
     }
 
     bool undo(songcore::Project& p, Position& position) { return travel(p, undo_, redo_, position); }

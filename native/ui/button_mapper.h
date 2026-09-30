@@ -35,6 +35,7 @@
 #include "ui/buttons.h"
 
 #include <cstdint>
+#include <cstdio>
 
 namespace pt::ui {
 
@@ -120,6 +121,13 @@ template <class Dispatcher>
 void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_t now) {
     const ButtonMods& m = e.mods;
 
+#ifndef NDEBUG
+    if (e.button == Button::SELECT || (m.select && is_dpad(e.button))) {
+        std::printf("history input: %s %s SELECT=%d A=%d B=%d L=%d R=%d\n",
+                    button_name(e.button), e.action == ButtonAction::PRESSED ? "DOWN" : "UP",
+                    m.select, m.a, m.b, m.l, m.r);
+    }
+#endif
 
     // ── R's HELD STATE IS PUBLISHED, ABOVE EVERY ARM AND EVERY EARLY RETURN ──────────────────────
     //
