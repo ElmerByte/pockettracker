@@ -670,6 +670,9 @@ void InputDispatcher::mark_dirty_and_arm_autosave() {
 }
 
 void InputDispatcher::mark_modified(bool table_touched) {
+    sequenceUndo_.record(host_.project(), s_.currentScreen == ScreenType::PHRASE ||
+                         s_.currentScreen == ScreenType::CHAIN || s_.currentScreen == ScreenType::SONG,
+                         sequence_position());
     mark_dirty_and_arm_autosave();
 
     // ⚠️ The consumer caches which tables it has already pushed to the engine. push_project

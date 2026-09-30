@@ -120,6 +120,7 @@ template <class Dispatcher>
 void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_t now) {
     const ButtonMods& m = e.mods;
 
+
     // ── R's HELD STATE IS PUBLISHED, ABOVE EVERY ARM AND EVERY EARLY RETURN ──────────────────────
     //
     // ⚠️⚠️ **THE ONE GESTURE HERE THAT IS NOT A CHORD OF BUTTONS.** MIDI learn is "hold R and turn a
@@ -174,7 +175,7 @@ void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_
             // The DEFERRED single-SELECT: it went down alone and nothing else was pressed while it was
             // held, so this is a bare SELECT — help, or the keyboard's abort. Same shape as the two
             // latches above; the difference is that ANY other press clears this one, not just a combo
-            // the matrix recognises, because SELECT+DPAD is unclaimed and must not read as a tap.
+            // the matrix recognises, because a SELECT chord must not read as a tap.
             if (ms.selectPressedAlone) {
                 ms.selectPressedAlone = false;
                 d.on_select();
@@ -216,6 +217,17 @@ void handle_button(const ButtonEvent& e, Dispatcher& d, MapperState& ms, uint64_
     // Silence a ringing audition on any "plain" press. START is exempt (it starts playback), and so is
     // anything pressed while A is held — that covers every edit combo, and an edit should stay audible.
     if (e.button != Button::START && !m.a) d.on_stop_preview();
+
+    d.on_history_begin();
+
+    // SELECT is the history modifier on the three sequence grids.
+    if (m.select && !m.a && !m.b && !m.l && !m.r) {
+        switch (e.button) {
+            case Button::DPAD_LEFT:  d.on_select_left();  return;
+            case Button::DPAD_RIGHT: d.on_select_right(); return;
+            default: break;
+        }
+    }
 
     // ── A + … : the tracker's core editing gesture ───────────────────────────────────────────────
     if (m.a && !m.l && !m.r) {

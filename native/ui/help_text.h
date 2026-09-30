@@ -413,7 +413,8 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "R+B mutes, R+A solos a track",
       "L+R brings every track back",
       "L+B marks cells, B copies them",
-      "L+A pastes"}},
+      "L+A pastes",
+      "SELECT+←/→ undo / redo"}},
     /* SCREEN_CHAIN */
     {"CHAIN: a run of phrases", "Played top to bottom by the", "song cell that points here.",
      {"A list of up to 16 phrases,",
@@ -425,7 +426,8 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "R+← goes back to the song",
       "B+D-PAD walks to another chain",
       "L+B marks cells, B copies them",
-      "L+A pastes"}},
+      "L+A pastes",
+      "SELECT+←/→ undo / redo"}},
     /* SCREEN_PHRASE */
     {"PHRASE: 16 steps of notes", "The smallest pattern. Chains", "string them into a song.",
      {"Sixteen steps, each with a",
@@ -437,7 +439,8 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "B+D-PAD walks to another phrase",
       "L+B marks cells, B copies them",
       "L+A pastes",
-      "L+B+A copies it to a new phrase"}},
+      "L+B+A copies it to a new phrase",
+      "SELECT+←/→ undo / redo"}},
     /* SCREEN_INSTRUMENT */
     {"INSTRUMENT: one sound", "A sample, a SoundFont, or an", "external MIDI device.",
      {"One of 128 sound slots. It",

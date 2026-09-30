@@ -72,6 +72,7 @@
 #include "songcore/midi_map.h"
 #include "ui/app_state.h"
 #include "ui/clipboard.h"
+#include "ui/sequence_undo.h"
 #include "ui/cursor.h"
 #include "ui/song_pointer.h"     // NAV = SONG — the ctor clamps the pointer onto a real cell
 #include "ui/filesystem.h"
@@ -125,6 +126,7 @@ class InputDispatcher {
         // pushed before this object existed: it is the LOAD path `reset_editing_context` covers, minus
         // the reset. A no-op under NAV = POOL and with no project pointed at yet (ui/song_pointer.h).
         clamp_song_pointer(s_);
+        sequenceUndo_.reset(host_.project());
     }
 
     /**
@@ -325,6 +327,12 @@ class InputDispatcher {
     void on_select_b();
     /** SELECT+R: create a folder here (opens the keyboard). */
     void on_select_r();
+    /** SELECT+LEFT/RIGHT: undo/redo sequence edits on PHRASE, CHAIN and SONG. */
+    void on_select_left();
+    void on_select_right();
+    void on_history_begin() {
+        sequenceUndo_.before_edit(sequence_position());
+    }
 
     // ── The plain buttons ────────────────────────────────────────────────────────────────────────
     /** B inside a selection COPIES it and exits — the tracker's copy gesture. */
@@ -332,11 +340,11 @@ class InputDispatcher {
     void on_button_a();
     /**
      * Bare SELECT raises help — the compact panel or the full overlay, as SETTINGS > HELP says — and
-     * aborts the keyboard. Nothing else is bound to it, on any screen.
+     * aborts the keyboard. Chords use SELECT as a modifier and cancel this tap.
      *
      * ⚠️ **Called on the RELEASE**, and only when SELECT went down and came back up with no other
      * button touched in between (ui/button_mapper.h). SELECT+A/B/R on the browser is a separate
-     * gesture and cancels this one.
+     * gesture and cancels this one, as do SELECT+LEFT/RIGHT for sequence history.
      */
     void on_select();
 
@@ -744,6 +752,7 @@ class InputDispatcher {
     bool recover_from_autosave();
 
     Clipboard clip_{};
+    SequenceUndo sequenceUndo_{};
 
     // ── The MUTE/SOLO chord's undo ───────────────────────────────────────────────────────────────
     // What the mix looked like when the chord started, so `on_r_combo_revert()` can put it back. All
@@ -849,6 +858,10 @@ class InputDispatcher {
 
     /** An edit happened: tell the sequencer, so a note already scheduled past the cursor is redone. */
     void mark_modified(bool table_touched = false);
+    void sequence_history(bool redo);
+    SequenceUndo::Position sequence_position() const {
+        return {s_.currentScreen, s_.currentPhrase, s_.currentChain, s_.cursorRow, s_.cursorColumn};
+    }
 
     /**
      * The first HALF of mark_modified — dirty the document and (re-)arm the crash autosave — split

@@ -114,6 +114,7 @@ void InputDispatcher::confirm_cancel() {
  * leaving `lastEditedChain` at 0x2F would have A,A on SONG insert a chain from the PREVIOUS song.
  */
 void InputDispatcher::reset_editing_context() {
+    sequenceUndo_.reset(host_.project());
     s_.currentPhrase = s_.currentChain = s_.currentInstrument = 0;
     s_.currentTable  = s_.currentGroove = 0;
     s_.lastEditedPhrase = s_.lastEditedChain = s_.lastEditedTable = 0;

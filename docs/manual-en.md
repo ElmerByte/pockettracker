@@ -333,6 +333,12 @@ Hold **R** and press a direction to move in the screen grid (see §4).
 
 ### 5.6 Copy / Paste
 
+On **PHRASE, CHAIN, and SONG**, hold **SELECT** and tap **LEFT** to undo or **RIGHT** to redo.
+The last 64 sequence edits share one history across these screens, including cut, paste, deletion,
+and deep cloning. Undo returns to the affected editor and cursor. A new sequence edit clears redo.
+Loading or creating a project clears history;
+sequence cleanup also clears it. History is kept only for the current session.
+
 Works on PHRASE, CHAIN, SONG, and TABLE screens.
 
 | Input | Action |

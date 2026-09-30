@@ -372,11 +372,35 @@ void InputDispatcher::on_button_b() {
     s_.selection.exit();
 }
 
+void InputDispatcher::sequence_history(bool redo) {
+    if (overlay_swallows(Overlay::NONE)) return;
+    if (s_.currentScreen != ScreenType::PHRASE && s_.currentScreen != ScreenType::CHAIN &&
+        s_.currentScreen != ScreenType::SONG) return;
+
+    auto& p = host_.edit_project();
+    auto position = sequence_position();
+    const bool changed = redo ? sequenceUndo_.redo(p, position) : sequenceUndo_.undo(p, position);
+    s_.statusMessage = changed ? (redo ? "REDO" : "UNDO") : (redo ? "NO REDO" : "NO UNDO");
+    s_.statusSuccess = changed;
+    if (!changed) return;
+    s_.currentScreen = position.screen;
+    s_.currentPhrase = position.phrase;
+    s_.currentChain = position.chain;
+    s_.cursorRow = position.row;
+    s_.cursorColumn = position.column;
+    s_.selection.exit();
+    clamp_song_pointer(s_);
+    if (s_.currentScreen == ScreenType::SONG) scroll_song_to_row(s_, s_.cursorRow);
+    // Do not call mark_modified: restoring history must not become a new edit or erase redo.
+    mark_dirty_and_arm_autosave();
+    if (host_.is_playing()) host_.notify_data_changed();
+}
+
+void InputDispatcher::on_select_left() { sequence_history(false); }
+void InputDispatcher::on_select_right() { sequence_history(true); }
+
 void InputDispatcher::on_select() {
-    // ⚠️ BARE SELECT IS HELP, AND THE KEYBOARD'S ABORT. That is the whole list, and the emptiness
-    // everywhere else was kept for years to make this possible: every action a cell could want from
-    // SELECT is already on the A or the B sitting on that same cell, so nothing had to be taken back
-    // off users when help landed.
+    // Bare SELECT is help and the keyboard's abort. SELECT chords cancel this deferred tap.
     //
     // ⚠️ **IT ARRIVES ON THE RELEASE, NOT THE PRESS** (ui/button_mapper.h), and that is what keeps the
     // three browser chords whole: SELECT is a MODIFIER there, so its press only arms SELECT+A/B/R and
