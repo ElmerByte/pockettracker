@@ -246,6 +246,7 @@ struct Voice : public IAudioVoice {
         // Copy send levels for use in the mix loop
         reverbSend = instrParams.reverbSend;
         delaySend  = instrParams.delaySend;
+        chorusSend = instrParams.chorusSend;
 
         tableId = tblId;
         tableTranspose = 0.0f;

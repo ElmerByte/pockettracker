@@ -62,17 +62,23 @@ enum class EffectsRow {
     REV_MOD     = 15,
     REV_SIZE    = 16,
     REV_ALGO    = 17,
+    CHORUS_RATE = 18,
+    CHORUS_DEPTH = 19,
+    CHORUS_MIX = 20,
 };
 
-inline constexpr int EFFECTS_ROW_COUNT = 18;
+inline constexpr int EFFECTS_ROW_COUNT = 21;
 
 /** The three sections, in the order they are drawn. Each gets a blank line and a header above it. */
-enum class EffectsSection { MASTER = 0, REVERB = 1, DELAY = 2 };
-inline constexpr int EFFECTS_SECTION_COUNT = 3;
+enum class EffectsSection { MASTER = 0, REVERB = 1, DELAY = 2, CHORUS = 3 };
+inline constexpr int EFFECTS_SECTION_COUNT = 4;
 
 constexpr EffectsSection effects_row_section(EffectsRow row) {
     switch (row) {
         case EffectsRow::MASTER_TYPE: return EffectsSection::MASTER;
+        case EffectsRow::CHORUS_RATE:
+        case EffectsRow::CHORUS_DEPTH:
+        case EffectsRow::CHORUS_MIX: return EffectsSection::CHORUS;
         case EffectsRow::REV_DECAY:
         case EffectsRow::REV_SIZE:
         case EffectsRow::REV_ALGO:
@@ -102,7 +108,7 @@ struct EffectsDisplayLine {
         : cell{left, right}, paired(true) {}
 };
 
-inline constexpr int EFFECTS_LINE_COUNT = 11;
+inline constexpr int EFFECTS_LINE_COUNT = 13;
 
 /**
  * The order the rows are DRAWN and the D-pad walks — decoupled from the enum VALUE above, which stays
@@ -141,6 +147,8 @@ inline constexpr EffectsDisplayLine EFFECTS_DISPLAY_LINES[EFFECTS_LINE_COUNT] = 
     {EffectsRow::DLY_TONE,   EffectsRow::DLY_FDBK},
     {EffectsRow::DLY_WOBBLE, EffectsRow::DLY_REV},
     {EffectsRow::DLY_EQ},
+    {EffectsRow::CHORUS_RATE, EffectsRow::CHORUS_DEPTH},
+    {EffectsRow::CHORUS_MIX},
 };
 
 namespace detail {

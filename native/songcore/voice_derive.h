@@ -231,7 +231,7 @@ void push_instrument_mod_eq_sends(Engine& engine, const Instrument& ins, int tem
     }
     if (!m.anyActive) engine.clearInstrumentModulation(ins.sampleId);
     engine.setInstrumentEqSlot(ins.sampleId, ins.eqSlot);
-    engine.setInstrumentSendLevels(ins.sampleId, ins.reverbSend, ins.delaySend);
+    engine.setInstrumentSendLevels(ins.sampleId, ins.reverbSend, ins.delaySend, ins.chorusSend);
 }
 
 // AudioEngine.updateInstrumentPlaybackParams — the sample-playback window, loop, drive/crush/

@@ -71,6 +71,7 @@ AudioEngine::AudioEngine() {
     const float defaultRate = static_cast<float>(effectsSampleRate);
     reverbSend.reset(defaultRate);
     delaySend.reset(defaultRate);
+    chorusSend.reset(defaultRate);
     masterChain.reset(defaultRate);
 }
 
@@ -782,6 +783,13 @@ void AudioEngine::setLimiterPreGain(int depth) {
     recordBus(BUS_LIMITER);
 }
 
+void AudioEngine::setChorusParams(int rateHex, int depthHex, int mixHex) {
+    busSettings.chorusRate = rateHex;
+    busSettings.chorusDepth = depthHex;
+    busSettings.chorusMix = mixHex;
+    recordBus(BUS_CHORUS);
+}
+
 IAudioVoice* AudioEngine::findActiveVoiceForTrack(int trackId) {
     // Returns the track's CURRENT note, for mid-note param updates (PBN/PVB/PAN). A releasing
     // SF voice or a fading (stolen) sampler voice is the previous note's tail, never the
@@ -958,6 +966,7 @@ void AudioEngine::resetEffectState() {
     const float sr = (float)getSampleRate();
     reverbSend.reset(sr);   // zeroes the delay lines AND reseeds ReverbSc's random-lineseg LCG
     delaySend.reset(sr);    // zeroes both delay lines
+    chorusSend.reset(sr);
     masterChain.reset(sr);  // OTT bands, DUST, limiter envelope, master EQ
     // Everything above is now at FACTORY DEFAULTS, not at the project's values. A render pushes the
     // project next; a device reopen replays `busSettings` (setDeviceSampleRate). Not replayed HERE:
@@ -1007,6 +1016,7 @@ void AudioEngine::applyBusSettings() {
         else                 masterChain.setDustDepth(s.dustDepth / 255.0f);
     }
     if (due(BUS_LIMITER)) masterChain.setLimiterPreGain(1.0f + (s.limiterPreGain / 255.0f) * 3.0f);
+    if (due(BUS_CHORUS)) chorusSend.setParams(s.chorusRate, s.chorusDepth, s.chorusMix);
 }
 
 int64_t AudioEngine::getFrameCounter() {

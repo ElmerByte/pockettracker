@@ -204,6 +204,7 @@ public:
     // The note's send levels, 0-1: seeded from the instrument at trigger, moved by REV / DEL.
     float reverbSend = 0.0f;
     float delaySend  = 0.0f;
+    float chorusSend = 0.0f;
 
     // True while this slot is producing audio (or fading out).
     virtual bool active() const = 0;

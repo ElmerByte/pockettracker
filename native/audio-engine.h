@@ -26,6 +26,7 @@
 #include "soundfont-trim.h"
 #include "effects/send-chain.h"
 #include "effects/master-chain.h"
+#include "effects/modules/chorus-module.h"
 
 // Per-track soundfont voice state (shares soundfonts[sfSlot].handle via MIDI channels).
 // 9 voices: song tracks 0-7 plus the dedicated preview lane (track 8 == AudioEngine::PREVIEW_LANE
@@ -636,7 +637,7 @@ public:
     // ===================================
 
     // Set reverb/delay send levels for an instrument (00-FF each, converted to float).
-    void setInstrumentSendLevels(int instrId, int reverbHex, int delayHex);
+    void setInstrumentSendLevels(int instrId, int reverbHex, int delayHex, int chorusHex = 0);
 
     // ===================================
     // REVERB / DELAY SEND METHODS
@@ -646,6 +647,7 @@ public:
     // wetHex controls return gain. ⚠️ sizeHex's default 0x60 is the room the reverb always had, so a
     // caller that predates it changes nothing.
     void setReverbParams(int feedbackHex, int dampHex, int wetHex = 0x80, int sizeHex = 0x60);
+    void setChorusParams(int rateHex, int depthHex, int mixHex);
 
     // Set the reverb's character: the three cells that place and colour the tail. ⚠️ Each is NEUTRAL
     // at the value a project written before they existed loads with — PRE 00, WIDE 80, MOD 40.
@@ -950,7 +952,7 @@ private:
     enum BusGroup {
         BUS_REVERB_PARAMS, BUS_REVERB_ALGO, BUS_REVERB_CHAR, BUS_REVERB_INEQ,
         BUS_DELAY_TIME, BUS_DELAY_FEEDBACK, BUS_DELAY_CHAR, BUS_DELAY_INEQ,
-        BUS_MASTER_EQ, BUS_OTT, BUS_MASTER_FX, BUS_DUST, BUS_LIMITER,
+        BUS_MASTER_EQ, BUS_OTT, BUS_MASTER_FX, BUS_DUST, BUS_LIMITER, BUS_CHORUS,
         BUS_GROUPS
     };
     struct BusSettings {
@@ -963,6 +965,7 @@ private:
         int   delayInputEq = -1, delayReverbSend = 0;
         int   masterEqSlot = -1;
         int   ottDepth = 0, masterFx = 0, dustDepth = 0, limiterPreGain = 0;
+        int   chorusRate = 0x40, chorusDepth = 0x80, chorusMix = 0;
         bool  ottForRender = false, dustForRender = false;   // snap rather than glide (…ForRender)
         bool  pushed = false;   // nothing is replayed until a setter has run
         uint32_t seq[BUS_GROUPS] = {};
@@ -1397,6 +1400,7 @@ private:
     // Send buses (reverb and delay)
     ReverbModule reverbSend;
     DelayModule  delaySend;
+    ChorusModule chorusSend;
     MasterChain  masterChain;  // final output bus
 
     // EQ preset bank (128 slots; pre-converted from hex to Hz/dB/Q)
@@ -1431,8 +1435,10 @@ private:
     // block; nothing persists across blocks.
     float revSendBufL[PROCESS_SUBBLOCK], revSendBufR[PROCESS_SUBBLOCK];   // panned reverb-send sum
     float dlySendBufL[PROCESS_SUBBLOCK], dlySendBufR[PROCESS_SUBBLOCK];   // panned delay-send sum
+    float choSendBufL[PROCESS_SUBBLOCK], choSendBufR[PROCESS_SUBBLOCK];
     float revWetL[PROCESS_SUBBLOCK], revWetR[PROCESS_SUBBLOCK];           // reverb wet output
     float dlyWetL[PROCESS_SUBBLOCK], dlyWetR[PROCESS_SUBBLOCK];           // delay wet output
+    float choWetL[PROCESS_SUBBLOCK], choWetR[PROCESS_SUBBLOCK];
     float instrSpectrumTempL[PROCESS_SUBBLOCK];                           // mono sum of a monitored instrument's voices
     float sfBuf[PROCESS_SUBBLOCK * 2];                                    // per-track SF render (interleaved stereo)
     float sfNoteBuf[PROCESS_SUBBLOCK * 2];                                // a stealing note's own pass, gained apart from the old one

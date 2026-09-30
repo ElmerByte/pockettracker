@@ -441,6 +441,7 @@ struct InstrumentParams {
     // Send levels (float 0.0–1.0; set by setInstrumentSendLevels)
     float reverbSend = 0.0f;
     float delaySend  = 0.0f;
+    float chorusSend = 0.0f;
 
     // ⚠️ THE EXACT-FRAME WINDOW: −1 = unset, and then startPoint/endPoint above decide. When set it
     // REPLACES them, in frames, because 0-255 cannot express a frame.

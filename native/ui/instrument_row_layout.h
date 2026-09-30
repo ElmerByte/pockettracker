@@ -51,7 +51,7 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SAMPLER[] = {
     InstrumentRowKind::DUAL,    //  8  CRUSH + FREQ
     InstrumentRowKind::DUAL,    //  9  DWNSMPL + RES
     InstrumentRowKind::SPACER,  // 10
-    InstrumentRowKind::DUAL,    // 11  REV + DEL
+    InstrumentRowKind::TRIPLE,  // 11  REV + DEL + CHO
     InstrumentRowKind::DUAL,    // 12  EQ + SLICE
     InstrumentRowKind::DUAL,    // 13  LOOP + START
     InstrumentRowKind::DUAL,    // 14  LOOP ST + END
@@ -74,7 +74,7 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SOUNDFONT[] = {
     InstrumentRowKind::SPACER,  // 11
     InstrumentRowKind::SINGLE,  // 12  REV
     InstrumentRowKind::SINGLE,  // 13  DEL
-    InstrumentRowKind::SINGLE,  // 14  EQ
+    InstrumentRowKind::DUAL,    // 14  EQ + CHO
 };
 
 /**
@@ -115,7 +115,7 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
     InstrumentRowKind::TRIPLE, InstrumentRowKind::TRIPLE,
     InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
     InstrumentRowKind::SPACER, InstrumentRowKind::DUAL,
-    InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
+    InstrumentRowKind::DUAL, InstrumentRowKind::TRIPLE,
     InstrumentRowKind::SINGLE,
     InstrumentRowKind::DUAL, // DRIVE + SYNC
 };

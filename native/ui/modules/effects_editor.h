@@ -64,6 +64,9 @@ public:
     static constexpr int ROW_REV_MOD     = static_cast<int>(EffectsRow::REV_MOD);      // 40 = as it shipped
     static constexpr int ROW_REV_SIZE    = static_cast<int>(EffectsRow::REV_SIZE);     // the room; 60 = as shipped
     static constexpr int ROW_REV_ALGO    = static_cast<int>(EffectsRow::REV_ALGO);     // 0 = as it shipped
+    static constexpr int ROW_CHORUS_RATE = static_cast<int>(EffectsRow::CHORUS_RATE);
+    static constexpr int ROW_CHORUS_DEPTH = static_cast<int>(EffectsRow::CHORUS_DEPTH);
+    static constexpr int ROW_CHORUS_MIX = static_cast<int>(EffectsRow::CHORUS_MIX);
     static constexpr int MAX_CURSOR_ROW  = EFFECTS_ROW_COUNT - 1;
 
     /** The sync subdivisions, in the order kDelaySyncBeats[] has them in delay-module.h. */

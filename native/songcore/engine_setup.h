@@ -197,6 +197,7 @@ void push_global_effects(Engine& engine, const Project& project, MixerHeld held 
     }
     engine.setReverbParams(project.reverbFeedback, project.reverbDamp, project.reverbWet,
                            project.reverbSize);
+    engine.setChorusParams(project.chorusRate, project.chorusDepth, project.chorusMix);
     engine.setReverbAlgo(project.reverbAlgo);
     engine.setReverbCharacter(project.reverbPreDelay, project.reverbWidth, project.reverbMod);
     engine.setReverbInputEq(project.reverbInputEq);

@@ -145,12 +145,13 @@ void InstrumentEditorModule::draw(Canvas& c, int x, int y, const InstrumentEdito
         draw_parameter_row(c, rowY, nameX, valueX, "DEL", hex2(ins.delaySend), on(0), on(1), t);
         rowY += ROW_HEIGHT; currentRow++;
 
-        draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow,
+        draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "CHO", hex2(ins.chorusSend), s.cursorRow,
                     s.cursorColumn, currentRow, t);
 
     } else {
-        draw_dual_row(c, rowY, nameX, valueX, "REV", hex2(ins.reverbSend), "DEL",
-                      hex2(ins.delaySend), s.cursorRow, s.cursorColumn, currentRow, t);
+        draw_triple_row(c, x, rowY, nameX, "REV", hex2(ins.reverbSend), "DEL",
+                        hex2(ins.delaySend), "CHO", hex2(ins.chorusSend),
+                        s.cursorRow, s.cursorColumn, currentRow, t);
         rowY += ROW_HEIGHT; currentRow++;
 
         draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot,
@@ -203,8 +204,9 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     draw_dual_row(c, rowY, nameX, valueX, "FREQ", hex2(ins.filterCut), "RES",
                   hex2(ins.filterRes), s.cursorRow, s.cursorColumn, 8, t);
     rowY += ROW_HEIGHT;
-    draw_dual_row(c, rowY, nameX, valueX, "REV", hex2(ins.reverbSend), "DEL",
-                      hex2(ins.delaySend), s.cursorRow, s.cursorColumn, 9, t);
+    draw_triple_row(c, x, rowY, nameX, "REV", hex2(ins.reverbSend), "DEL",
+                    hex2(ins.delaySend), "CHO", hex2(ins.chorusSend),
+                    s.cursorRow, s.cursorColumn, 9, t);
     rowY += ROW_HEIGHT;
     draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 10, t);
     rowY += ROW_HEIGHT;
@@ -481,6 +483,7 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         if (row == 9) {
             if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255);
             if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255);
+            if (col == 5) return cc::hex_byte(ins.chorusSend, 0, 255);
         }
         if (row == 10 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
@@ -647,7 +650,8 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
                                          : cc::hex_byte(ins.reverbSend, 0, 255, -1, false, false, false, 0x00);
         if (row == 13) return (col == 0) ? cc::read_only()
                                          : cc::hex_byte(ins.delaySend, 0, 255, -1, false, false, false, 0x00);
-        if (row == 14) return (col == 0) ? cc::read_only() : eq_context();
+        if (row == 14 && col == 1) return eq_context();
+        if (row == 14 && col == 3) return cc::hex_byte(ins.chorusSend, 0, 255);
         return cc::none();
     }
 
@@ -655,6 +659,7 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         case 11:  // REV + DEL
             if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255, -1, false, false, false, 0x00);
             if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255, -1, false, false, false, 0x00);
+            if (col == 5) return cc::hex_byte(ins.chorusSend, 0, 255, -1, false, false, false, 0x00);
             return cc::none();
 
         case 12:  // EQ + SLICE
@@ -780,6 +785,7 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         } else if (row == 9) {
             if (col == 1) b255(ins.reverbSend);
             if (col == 3) b255(ins.delaySend);
+            if (col == 5) b255(ins.chorusSend);
         } else if (row == 10 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
@@ -876,8 +882,9 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         // ⚠️ On a SAMPLER, SLICE shares this row, so the EQ arm is no longer the whole row — an edit
         // that ignored the column would write an EQ slot of 0, 1 or 2 every time SLICE was cycled.
         // The SoundFont has no second column here and falls into the EQ half for any column.
-        if (col == 3 && !sf) {
-            if (isSet) ins.slicingMode = clamp(v, 0, 2);
+        if (col == 3) {
+            if (sf) b255(ins.chorusSend);
+            else if (isSet) ins.slicingMode = clamp(v, 0, 2);
         } else {
             // The EQ slot. −1 is "no EQ", so DELETE clears to it and INSERT lands on slot 0.
             if (isSet)                                       ins.eqSlot = clamp(v, 0, 127);
@@ -888,6 +895,7 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
     } else if (!sf && row == 11) {
         if (col == 1) b255(ins.reverbSend);
         else if (col == 3) b255(ins.delaySend);
+        else if (col == 5) b255(ins.chorusSend);
 
     } else if (!sf && row == 13) {
         if (col == 1 && isSet && v >= 0 && v < static_cast<int>(loop_modes().size()))

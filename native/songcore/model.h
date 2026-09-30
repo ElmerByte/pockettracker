@@ -532,7 +532,7 @@ struct Instrument {
     std::optional<std::string> soundfontPath;    // null
     int sfBank = 0, sfPreset = 0;
     SFOverrides sfOverrides{};
-    int reverbSend = 0x00, delaySend = 0x00;
+    int reverbSend = 0x00, delaySend = 0x00, chorusSend = 0x00;
     int eqSlot = -1;
     int slicingMode = 0;
     std::vector<int64_t> sliceMarkers;           // emptyList()
@@ -660,6 +660,7 @@ struct Project {
     int transpose = 0;
     int masterVolume = 0xFF;
     int ottDepth = 0, masterBusFx = 0, dustDepth = 0, limiterPreGain = 0;
+    int chorusRate = 0x40, chorusDepth = 0x80, chorusMix = 0;
     std::vector<EqPreset> eqPresets;              // Array(128){EqPreset(it)} — filled by factory
     // ⚠️ `reverbFeedback` is the DCAY cell — the tail's length — and has been since before the room
     // could change; the name is the JSON key's and stays. The room is `reverbSize` below.

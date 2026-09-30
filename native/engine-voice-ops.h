@@ -120,6 +120,7 @@ static inline void voiceReloadInstrument(V& v, const InstrumentParams& ip, float
     voiceSetDrive(v, ip.drive);
     voiceSetCrush(v, ((ip.crush & 0x0F) << 4) | (ip.downsample & 0x0F));
     voiceSetSends(v, ip.reverbSend, ip.delaySend);
+    v.chorusSend = ip.chorusSend;
 }
 
 // ─── FIN — the one command that lands in a bus slot the voices ALREADY reset ─────────────────────

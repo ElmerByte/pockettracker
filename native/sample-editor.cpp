@@ -869,10 +869,11 @@ void AudioEngine::setProgram(int instrumentId, const songcore::Program& program,
     programs.publish(instrumentId);
 }
 
-void AudioEngine::setInstrumentSendLevels(int instrId, int reverbHex, int delayHex) {
+void AudioEngine::setInstrumentSendLevels(int instrId, int reverbHex, int delayHex, int chorusHex) {
     if (instrId < 0 || instrId >= 256) return;
     instrumentParams.edit(instrId).reverbSend = reverbHex / 255.0f;
     instrumentParams.edit(instrId).delaySend  = delayHex  / 255.0f;
+    instrumentParams.edit(instrId).chorusSend = chorusHex / 255.0f;
     instrumentParams.publish(instrId);
 }
 

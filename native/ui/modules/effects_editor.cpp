@@ -184,6 +184,11 @@ void EffectModule::draw(Canvas& c, int x, int y, const EffectState& s) const {
     param("REV",  ROW_DLY_REV,    hex2(p.delayReverbSend));
 
     eq_param(ROW_DLY_EQ, p.delayInputEq);
+
+    header("CHORUS", EffectsSection::CHORUS);
+    param("RATE", ROW_CHORUS_RATE, hex2(p.chorusRate));
+    param("DEP", ROW_CHORUS_DEPTH, hex2(p.chorusDepth));
+    param("MIX", ROW_CHORUS_MIX, hex2(p.chorusMix));
 }
 
 // ─── Cursor ──────────────────────────────────────────────────────────────────────────────────────
@@ -272,6 +277,10 @@ CursorContext EffectModule::cursor_context(const EffectState& s) const {
             return cc::hex_byte(p.delayInputEq < 0 ? -1 : p.delayInputEq, 0, 127,
                                 /*empty_value=*/-1, /*can_delete=*/true, /*can_insert=*/true);
 
+        case ROW_CHORUS_RATE: return cc::hex_byte(p.chorusRate, 0, 255, -1, false, false, false, 0x40);
+        case ROW_CHORUS_DEPTH: return cc::hex_byte(p.chorusDepth, 0, 255, -1, false, false, false, 0x80);
+        case ROW_CHORUS_MIX: return cc::hex_byte(p.chorusMix, 0, 255, -1, false, false, false, 0);
+
         default:
             return cc::none();
     }
@@ -302,6 +311,9 @@ songcore::MapTarget EffectModule::map_target(const EffectState& s) const {
         case EffectsRow::DLY_PONG:
         case EffectsRow::REV_TYPE:
         case EffectsRow::REV_ALGO:
+        case EffectsRow::CHORUS_RATE:
+        case EffectsRow::CHORUS_DEPTH:
+        case EffectsRow::CHORUS_MIX:
             break;
     }
     return {};
@@ -438,6 +450,19 @@ EffectInputResult EffectModule::handle_input(songcore::Project& p, int cursor_ro
                 case ActionType::INSERT_DEFAULT: p.delayInputEq = 0;  break;
                 default:                         return {false};
             }
+            return {true};
+
+        case ROW_CHORUS_RATE:
+            if (!isSet) break;
+            p.chorusRate = clamp(action.value, 0, 255);
+            return {true};
+        case ROW_CHORUS_DEPTH:
+            if (!isSet) break;
+            p.chorusDepth = clamp(action.value, 0, 255);
+            return {true};
+        case ROW_CHORUS_MIX:
+            if (!isSet) break;
+            p.chorusMix = clamp(action.value, 0, 255);
             return {true};
 
         default:

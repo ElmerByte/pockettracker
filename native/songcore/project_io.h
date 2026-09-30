@@ -266,6 +266,7 @@ inline Instrument parse_instrument(const json& j, int index) {
     { auto it = j.find("sfOverrides"); if (it != j.end() && it->is_object()) i.sfOverrides = parse_sf_overrides(*it); }
     i.reverbSend     = get_int(j, "reverbSend", i.reverbSend);
     i.delaySend      = get_int(j, "delaySend", i.delaySend);
+    i.chorusSend     = get_int(j, "chorusSend", i.chorusSend);
     i.eqSlot         = get_int(j, "eqSlot", i.eqSlot);
     i.slicingMode    = get_int(j, "slicingMode", i.slicingMode);
     i.transposeEnabled = get_bool(j, "transposeEnabled", i.transposeEnabled);
@@ -345,6 +346,9 @@ inline Project parse_project(const json& j) {
     p.masterBusFx     = get_int(j, "masterBusFx", p.masterBusFx);
     p.dustDepth       = get_int(j, "dustDepth", p.dustDepth);
     p.limiterPreGain  = get_int(j, "limiterPreGain", p.limiterPreGain);
+    p.chorusRate      = get_int(j, "chorusRate", p.chorusRate);
+    p.chorusDepth     = get_int(j, "chorusDepth", p.chorusDepth);
+    p.chorusMix       = get_int(j, "chorusMix", p.chorusMix);
     p.eqPresets       = parse_pool<EqPreset>(j, "eqPresets", parse_eq_preset);
     p.reverbFeedback  = get_int(j, "reverbFeedback", p.reverbFeedback);
     p.reverbDamp      = get_int(j, "reverbDamp", p.reverbDamp);
@@ -745,6 +749,7 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.sfOverrides != SFOverrides{}) { w.key("sfOverrides"); emit_sf_overrides(w, i.sfOverrides); }
     if (i.reverbSend != 0x00) w.field_int("reverbSend", i.reverbSend);
     if (i.delaySend != 0x00) w.field_int("delaySend", i.delaySend);
+    if (i.chorusSend != 0x00) w.field_int("chorusSend", i.chorusSend);
     if (i.eqSlot != -1)     w.field_int("eqSlot", i.eqSlot);
     if (i.slicingMode != 0) w.field_int("slicingMode", i.slicingMode);
     // ⚠️ Defaults to TRUE, so the guard is inverted — the field appears only once turned OFF, which is
@@ -804,6 +809,9 @@ inline std::string serialize_project(const Project& p) {
     if (p.masterBusFx != 0)     w.field_int("masterBusFx", p.masterBusFx);
     if (p.dustDepth != 0)       w.field_int("dustDepth", p.dustDepth);
     if (p.limiterPreGain != 0)  w.field_int("limiterPreGain", p.limiterPreGain);
+    if (p.chorusRate != 0x40)   w.field_int("chorusRate", p.chorusRate);
+    if (p.chorusDepth != 0x80)  w.field_int("chorusDepth", p.chorusDepth);
+    if (p.chorusMix != 0)       w.field_int("chorusMix", p.chorusMix);
     emit_pool(w, "eqPresets", p.eqPresets, emit_eq_preset);
     if (p.reverbFeedback != 0x60) w.field_int("reverbFeedback", p.reverbFeedback);
     if (p.reverbDamp != 0x80)     w.field_int("reverbDamp", p.reverbDamp);

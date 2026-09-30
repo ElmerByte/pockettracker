@@ -128,6 +128,7 @@ void AudioEngine::triggerSoundfontNote(const ScheduledNote& note, int frame, int
     }
     sv.reverbSend = ip.reverbSend;
     sv.delaySend  = ip.delaySend;
+    sv.chorusSend = ip.chorusSend;
 
     sv.params.setBase(PARAM_VOL,   note.volume);
     sv.params.setBase(PARAM_PAN,   note.pan);
@@ -371,12 +372,15 @@ float AudioEngine::mixTrackBuffer(V& v, int t, float* buf, const TrackBufferMix&
     }
 
     // SEND TAP: the post-chain buffer into the reverb/delay buses
-    if ((stemsMode == 0 || stemsMode >= 9) && (v.reverbSend > 0.0f || v.delaySend > 0.0f)) {
+    if ((stemsMode == 0 || stemsMode >= 9) &&
+        (v.reverbSend > 0.0f || v.delaySend > 0.0f || v.chorusSend > 0.0f)) {
         for (int i = 0; i < c.numFrames; i++) {
             revSendBufL[i] += buf[i * 2]     * v.reverbSend;
             revSendBufR[i] += buf[i * 2 + 1] * v.reverbSend;
             dlySendBufL[i] += buf[i * 2]     * v.delaySend;
             dlySendBufR[i] += buf[i * 2 + 1] * v.delaySend;
+            choSendBufL[i] += buf[i * 2]     * v.chorusSend;
+            choSendBufR[i] += buf[i * 2 + 1] * v.chorusSend;
         }
     }
 
@@ -533,6 +537,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
     // only [0,numFrames) is ever touched.
     memset(revSendBufL, 0, frameBytes); memset(revSendBufR, 0, frameBytes);
     memset(dlySendBufL, 0, frameBytes); memset(dlySendBufR, 0, frameBytes);
+    memset(choSendBufL, 0, frameBytes); memset(choSendBufR, 0, frameBytes);
 
     // The 64 KB+ OCTA accumulator pair is read only by OCTA — zero/fill it only when OCTA is shown.
     // trackWasActive is reset every block (matches the former `= {}` init; read under octaWanted below).
@@ -1066,6 +1071,10 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 dlySendBufL[i] += procL * voiceFade * panL * voice.delaySend;
                 dlySendBufR[i] += procR * voiceFade * panR * voice.delaySend;
             }
+            if ((stemsMode == 0 || stemsMode >= 9) && voice.chorusSend > 0.0f) {
+                choSendBufL[i] += procL * voiceFade * panL * voice.chorusSend;
+                choSendBufR[i] += procR * voiceFade * panR * voice.chorusSend;
+            }
 
             float globalMul = trackVol * antiClick;
             procL *= globalMul;
@@ -1452,6 +1461,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             }
         }
         reverbSend.process(revSendBufL, revSendBufR, revWetL, revWetR, numFrames);
+        chorusSend.process(choSendBufL, choSendBufR, choWetL, choWetR, numFrames);
         // Only capture when the EQ/spectrum UI is actually polling, and never block the audio
         // thread on the UI's read — try_lock and drop this block's data on contention (invisible).
         if (spectrumWanted) {
@@ -1479,8 +1489,8 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             float dl  = dlyWetL[i] * dlReturn * dlGate;
             float dlR = dlyWetR[i] * dlReturn * dlGate;
             if (stemsMode == 0) {
-                output[i * channelCount]     += rv + dl;
-                output[i * channelCount + 1] += rvR + dlR;
+                output[i * channelCount]     += rv + dl + choWetL[i];
+                output[i * channelCount + 1] += rvR + dlR + choWetR[i];
             } else if (stemsMode == 9) {
                 output[i * channelCount]     += rv;
                 output[i * channelCount + 1] += rvR;
