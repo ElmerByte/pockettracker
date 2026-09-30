@@ -818,9 +818,8 @@ class MainActivity : SDLActivity() {
         const val SETTINGS_IMPORT_VERSION = 2
         const val IMPORT_VERSION_KEY = "settings_import_version"
 
-        /** The Compose default for the skin pref (`DeviceSkin.AMIGA_DARK.id`), read when the user never
-         *  chose one — the shell's own fallback for an unknown id is the same skin (device_skin.h). */
-        const val DEFAULT_SKIN_ID = "amiga-2"
+        /** Skin used when legacy preferences contain no explicit selection. */
+        const val DEFAULT_SKIN_ID = "amiga-transparent"
 
         /** [safRequestRoot]'s `startActivityForResult` code, matched in [onActivityResult]. */
         const val REQ_ADD_ROOT = 1001

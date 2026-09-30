@@ -654,9 +654,9 @@ int run(const AppConfig& cfg) {
     }
 
     // Resolve the PERSISTED skin id (a stable string, `portrait_skin`) to the runtime index the SETTINGS
-    // skin column edits. device_skin.h falls back to DARK for an unknown id, so a missing/mangled key
-    // keeps the shell's shipped look. The loop's `loadedSkinIdx` sync turns this index into the loaded
-    // textures + PortraitSkin's scalars on the first frame, and again whenever the user changes it.
+    // skin column edits. device_skin.h falls back to TRNS for an unknown id. The loop's `loadedSkinIdx`
+    // sync turns this index into the loaded textures + PortraitSkin's scalars on the first frame, and
+    // again whenever the user changes it.
     state.settings.skinIndex = device_skin_index(state.settings.portraitSkin);
 
     // And the persisted OVERLAY selection (`overlay_name`, "OFF" or a stable id) to its cycle index —

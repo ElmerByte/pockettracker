@@ -36,8 +36,7 @@ struct DeviceSkinDef {
     SkinArt     art;              // ⚠️ see below — it decides the art, the layout and the colour source
 };
 
-// NORM = beige amiga skin, near-black labels; DARK = slate amiga-2 skin, white labels. DARK is index 1
-// and the fallback below, because it is the look the shell shipped hardcoded before selection existed.
+// NORM = beige amiga skin, near-black labels; DARK = slate amiga-2 skin, white labels.
 //
 // ⚠️ TRNS is not another set of chrome art. Anything but `SkinArt::Chrome` turns three things over at
 // once:
@@ -55,13 +54,11 @@ inline constexpr DeviceSkinDef kDeviceSkins[] = {
 };
 inline constexpr int kDeviceSkinCount = static_cast<int>(sizeof(kDeviceSkins) / sizeof(kDeviceSkins[0]));
 
-/** Resolve a persisted skin id to its index; an unknown / mangled id → DARK (1), the shell's prior
- *  hardcode, so an older or hand-edited settings.json keeps the look it shipped with rather than
- *  jumping to NORM. */
+/** Resolve a persisted skin id to its index; an unknown id uses the default TRNS skin. */
 inline int device_skin_index(const std::string& id) {
     for (int i = 0; i < kDeviceSkinCount; ++i)
         if (id == kDeviceSkins[i].id) return i;
-    return 1;  // amiga-2 / DARK
+    return 2;  // amiga-transparent / TRNS
 }
 
 }  // namespace ptshell
