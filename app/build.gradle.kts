@@ -238,6 +238,7 @@ val licensePayload = mapOf(
     "THIRD-PARTY-NOTICES.md"          to "docs/licenses/THIRD-PARTY-NOTICES.md",       // every statically linked component
     "CREDITS.md"                      to "CREDITS.md",                                 // the Gradle-resolved Android dependencies
     "OFL-1.1-LinuxBiolinum.txt"       to "docs/licenses/OFL-1.1-LinuxBiolinum.txt",    // Linux Biolinum font
+    "OFL-1.1-Hurmit.txt"              to "docs/licenses/OFL-1.1-Hurmit.txt",           // Hurmit Nerd Font
     "libogg-COPYING"                  to "native/vendor/ogg/COPYING",                  // BSD-3-Clause
     "libopus-COPYING"                 to "native/vendor/opus/COPYING",                 // BSD-3-Clause
     "libopus-LICENSE_PLEASE_READ.txt" to "native/vendor/opus/LICENSE_PLEASE_READ.txt", // upstream's patent note

@@ -138,6 +138,7 @@ cp "$SRC/native/vendor/opus/LICENSE_PLEASE_READ.txt"    "$STAGE/licenses/libopus
 # desktop build, the OFL's "must accompany the font" clause is already satisfied rather than newly
 # breached.
 cp "$SRC/docs/licenses/OFL-1.1-LinuxBiolinum.txt"        "$STAGE/licenses/OFL-1.1-LinuxBiolinum.txt"
+cp "$SRC/docs/licenses/OFL-1.1-Hurmit.txt"               "$STAGE/licenses/OFL-1.1-Hurmit.txt"
 
 cat > "$STAGE/README.txt" <<EOF
 PocketTracker $VERSION — Linux (x86-64)
@@ -180,7 +181,7 @@ tar tzf "$TARBALL"
 echo
 echo "read back out of the tarball:"
 for NEEDED in "PocketTracker" "README.txt" "licenses/LICENSE" "licenses/THIRD-PARTY-NOTICES.md" \
-              "licenses/CREDITS.md" "licenses/OFL-1.1-LinuxBiolinum.txt" \
+              "licenses/CREDITS.md" "licenses/OFL-1.1-LinuxBiolinum.txt" "licenses/OFL-1.1-Hurmit.txt" \
               "licenses/libogg-COPYING" "licenses/libopus-COPYING" \
               "licenses/libopus-LICENSE_PLEASE_READ.txt"; do
     # ⚠️ `|| BYTES=0` is what makes the failure READABLE. A member that is not in the archive makes

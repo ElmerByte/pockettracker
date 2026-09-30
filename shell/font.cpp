@@ -11,9 +11,8 @@ namespace ptshell {
 
 namespace {
 
-// Minimal UTF-8 → codepoint step. The labels are ASCII today, but decoding properly costs nothing and
-// means a future accented label is not mangled. Returns bytes consumed; a malformed lead byte is passed
-// through as Latin-1 (1 byte) rather than aborting the string.
+// Minimal UTF-8 → codepoint step, including the Nerd Font symbols used by TRNS. Returns bytes
+// consumed; a malformed lead byte is passed through as Latin-1 rather than aborting the string.
 int utf8_next(const char* s, const char* end, std::uint32_t& cp) {
     const auto b0 = static_cast<unsigned char>(*s);
     if (b0 < 0x80) { cp = b0; return 1; }
@@ -215,6 +214,19 @@ void Font::draw_text(const std::string& text, int x_left, int y_top, float px, s
         }
         pen += g.advance;
     }
+}
+
+int Font::text_width(const std::string& text, float px) {
+    if (!ready_) return 0;
+    int width = 0;
+    const char* s = text.c_str();
+    const char* end = s + text.size();
+    while (s < end) {
+        std::uint32_t cp = 0;
+        s += utf8_next(s, end, cp);
+        width += glyph_tex(cp, px).advance;
+    }
+    return width;
 }
 
 void Font::draw_arrow(Arrow dir, const SDL_Rect& box, std::uint32_t rgb) {

@@ -19,6 +19,7 @@ this file is the engine, i.e. what ships in *both* the APK and the Linux port. T
 | Not engine-compiled | Why it is here anyway | Where it ships |
 |---|---|---|
 | Linux Biolinum (font asset) | The OFL requires its licence to accompany the font | wherever `assets/fonts/` travel |
+| Hurmit Nerd Font Propo (font asset) | The OFL requires its licence to accompany the font | wherever `assets/fonts/` travel |
 | Oboe, the AndroidX libraries | Apache-2.0 §4(a) requires supplying a *copy of the License* | the APK only |
 
 **Naming a licence is not supplying one.** `CREDITS.md` attributes everything the project builds on
@@ -418,6 +419,21 @@ maintainer did not write the source and does not know its origin, which leaves i
 copyright. What ships instead is `shell/miyoo/neon_compat.c`, PocketTracker's own plain-C
 implementation of the same 25 entry points, covered by the GPL-3.0 in `licenses/LICENSE` with
 everything else of ours. Nothing from that repository is in the package.
+
+---
+
+## Hurmit Nerd Font Propo — SIL Open Font License 1.1
+
+Used for: the labels, shift symbols and directional arrows on the transparent portrait touch skin
+(`app/src/main/assets/fonts/HurmitNerdFontPropo-Regular.otf`). Taken unmodified from the Nerd Fonts
+Hermit v3.5.1 archive. Hermit is by Pablo Caro; the patched font is named **Hurmit** because Hermit is
+a reserved font name. The complete bundled licence is `licenses/OFL-1.1-Hurmit.txt`.
+
+The shift symbol and arrows come from
+[Material Design Icons](https://github.com/Templarian/MaterialDesign-Font) (Apache-2.0). The patched
+font also contains [Font Awesome](https://github.com/FortAwesome/Font-Awesome) icons (CC BY 4.0).
+See the Apache-2.0 text below and the
+[CC BY 4.0 licence](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 

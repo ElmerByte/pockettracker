@@ -146,6 +146,7 @@ cp "$SRC/native/vendor/opus/LICENSE_PLEASE_READ.txt"    "$STAGE/pockettracker/li
 # handheld build, the OFL's "must accompany the font" clause is already satisfied rather than newly
 # breached.
 cp "$SRC/docs/licenses/OFL-1.1-LinuxBiolinum.txt"       "$STAGE/pockettracker/licenses/OFL-1.1-LinuxBiolinum.txt"
+cp "$SRC/docs/licenses/OFL-1.1-Hurmit.txt"              "$STAGE/pockettracker/licenses/OFL-1.1-Hurmit.txt"
 ls -1 "$STAGE/pockettracker/licenses/"
 
 echo
@@ -287,7 +288,7 @@ fi
 echo
 echo "licences, read back out of the zip:"
 for L in LICENSE THIRD-PARTY-NOTICES.md CREDITS.md libogg-COPYING libopus-COPYING \
-         libopus-LICENSE_PLEASE_READ.txt OFL-1.1-LinuxBiolinum.txt; do
+         libopus-LICENSE_PLEASE_READ.txt OFL-1.1-LinuxBiolinum.txt OFL-1.1-Hurmit.txt; do
     # ⚠️ `|| BYTES=0` is what makes the failure READABLE. A member that is not in the archive makes
     # unzip exit 11, and under `set -euo pipefail` that kills the script mid-loop — before the FAIL
     # line below, so the package is rejected without ever naming the file that is missing. Absent and

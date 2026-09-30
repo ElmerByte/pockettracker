@@ -1,16 +1,14 @@
-// ─── shell/font.h — the shell's text renderer: Helvetica labels as SDL textures (convergence D) ────
+// ─── shell/font.h — portrait button labels as SDL textures ────────────────────────────────────────
 //
-// The SDL half of the button font. `font_raster.h` (pure, SDL-free) turns the app's Helvetica .otf into
+// The SDL half of the button font. `font_raster.h` (pure, SDL-free) turns bundled .otf/.ttf files into
 // alpha-coverage bitmaps; this uploads them to `SDL_Texture`s, caches them per (codepoint, size), and
 // blits UTF-8 strings — the twin of skin.cpp (SDL textures) over image.cpp (pure decode). It is the
 // RENDERER's, and its lifetime is the renderer's: textures come from an `SDL_Renderer*` and must be
 // destroyed before it is (`unload()` before `SdlVideo::close()`), exactly as `Skin` requires.
 //
 // Two things it draws:
-//   • draw_text — LABELS: the letters ("L Shift", "Sel", "A", …) in Helvetica, AND the D-pad arrows
-//     (↑↓←→) when a `Font` loaded from an arrow-bearing font is used (the shell bundles Linux Biolinum
-//     for exactly those four glyphs, since Helvetica's are .notdef — ptfont proves it). Both are real
-//     glyphs, alpha-blended and tinted, which is what Android did (Text through the system fallback).
+//   • draw_text — LABELS: Helvetica + Linux Biolinum arrows for the chrome skins, and Hurmit Nerd Font
+//     Propo for TRNS labels and symbols. Glyphs are alpha-blended and tinted to the chosen skin.
 //   • draw_arrow — the FALLBACK D-pad arrow, used only when the arrow font failed to load: a smooth
 //     anti-aliased THIN-LINE arrow (a stroked shaft + an open chevron head) drawn from a hi-res coverage
 //     sprite, linear-filtered, so a missing arrow font degrades to a clean line arrow rather than tofu.
@@ -61,15 +59,12 @@ public:
      * Draw UTF-8 `text` with its top-left at (`x_left`, `y_top`), em size `px` (the fontSize sense: the
      * em square maps to px pixels), tinted `rgb` (0xRRGGBB). The baseline is placed `ascent_px(px)`
      * below `y_top`, matching a Compose `Text`'s first-baseline-to-top. A codepoint the font lacks is
-     * skipped (its advance still applies) — letters only reach here; arrows go through draw_arrow.
+     * skipped (its advance still applies).
      */
     void draw_text(const std::string& text, int x_left, int y_top, float px, uint32_t rgb);
 
-    // ⚠️ There is deliberately NO measure()/text-width helper here. The one that existed rasterized
-    // every glyph through Rasterizer::glyph() — the full stbtt_MakeGlyphBitmap path, bypassing the
-    // cache glyph_tex() uses — to compute an advance it then threw away, so calling it per frame to
-    // centre a label would rasterize the whole string per frame. If a caller needs a width, add one
-    // that sums glyph_tex(...).advance and inherits the cache.
+    /** Advance width of a UTF-8 label, using the same cached glyphs as draw_text. */
+    int text_width(const std::string& text, float px);
 
     /** The baseline drop below the text top at `px` — a Compose `Text` places its first baseline here. */
     int ascent_px(float px) const { return rast_.ascent_px(px); }

@@ -113,6 +113,7 @@ Copy-Item (Join-Path $repo 'native\vendor\opus\LICENSE_PLEASE_READ.txt') (Join-P
 # desktop build, the OFL's "must accompany the font" clause is already satisfied rather than newly
 # breached.
 Copy-Item (Join-Path $repo 'docs\licenses\OFL-1.1-LinuxBiolinum.txt')    (Join-Path $lic 'OFL-1.1-LinuxBiolinum.txt')
+Copy-Item (Join-Path $repo 'docs\licenses\OFL-1.1-Hurmit.txt')           (Join-Path $lic 'OFL-1.1-Hurmit.txt')
 
 # ⚠️ SDL's licence comes out of the SOURCE THAT WAS ACTUALLY COMPILED, not from a copy kept in this
 # repo. FetchContent put it in the build tree, so the licence that ships is the licence of the code
@@ -283,7 +284,8 @@ try {
                           'PocketTracker/licenses/libogg-COPYING',
                           'PocketTracker/licenses/libopus-COPYING',
                           'PocketTracker/licenses/libopus-LICENSE_PLEASE_READ.txt',
-                          'PocketTracker/licenses/OFL-1.1-LinuxBiolinum.txt')) {
+                          'PocketTracker/licenses/OFL-1.1-LinuxBiolinum.txt',
+                          'PocketTracker/licenses/OFL-1.1-Hurmit.txt')) {
         $e = $archive.GetEntry($needed)
         if (-not $e)            { throw "$needed is MISSING from the zip" }
         if ($e.Length -lt 100)  { throw "$needed is only $($e.Length) bytes inside the zip" }

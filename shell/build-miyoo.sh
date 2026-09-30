@@ -221,6 +221,7 @@ cp "$SRC/native/vendor/ogg/COPYING"                  "$GAMEDIR/licenses/libogg-C
 cp "$SRC/native/vendor/opus/COPYING"                 "$GAMEDIR/licenses/libopus-COPYING"
 cp "$SRC/native/vendor/opus/LICENSE_PLEASE_READ.txt" "$GAMEDIR/licenses/libopus-LICENSE_PLEASE_READ.txt"
 cp "$SRC/docs/licenses/OFL-1.1-LinuxBiolinum.txt"    "$GAMEDIR/licenses/OFL-1.1-LinuxBiolinum.txt"
+cp "$SRC/docs/licenses/OFL-1.1-Hurmit.txt"           "$GAMEDIR/licenses/OFL-1.1-Hurmit.txt"
 
 # ⚠️ THESE TWO SHIP ONLY HERE. Every other package links the device's own SDL2 and therefore owes it
 # no notice; this one carries the binary, so it carries SDL's zlib text and the fork's GPL-3.0 text
@@ -584,6 +585,7 @@ MEMBERS=( Roms/PORTS/Shortcuts/PocketTracker.port
           $G/licenses/libopus-COPYING
           $G/licenses/libopus-LICENSE_PLEASE_READ.txt
           $G/licenses/OFL-1.1-LinuxBiolinum.txt
+          $G/licenses/OFL-1.1-Hurmit.txt
           $G/licenses/libSDL2-zlib-LICENSE.txt
           $G/licenses/libSDL2-miyoo-fork-GPL-3.0.txt )
 # ⚠️ An ARRAY, and the demo's members are APPENDED FROM THE STAGING TREE rather than typed: the file
