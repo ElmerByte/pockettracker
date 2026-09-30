@@ -418,21 +418,22 @@ enum class MidiRow {
     OFFSET   = 2,   // -99..+99 MS           — the cable
     SYNC     = 3,   // ON | OFF              — the cable (24 PPQN clock + transport)
     CTL_CH   = 4,   // ALL | 01..16          — the cable: which channel carries MAPPING knobs
-    KEYS     = 5,   // MONO | POLY 2..8      — how a live key plays (settings.json)
-    PROG_CHG = 6,   // ON | OFF              — the project (Instrument BANK/PROG on note-on)
-    MAPPING  = 7,   // A: the mapping list   — the project
-    PANIC    = 8,   // A: ALL NOTES OFF
-    TEST     = 9,   // A: C-4 CH 1
+    PROG_CHG = 5,   // ON | OFF              — the project (Instrument BANK/PROG on note-on)
+    KEYS     = 6,   // MONO | POLY 2..8      — how a live key plays (settings.json)
+    VELOCITY = 7,   // ON | OFF              — OFF plays every live key at full strength (settings.json)
+    MAPPING  = 8,   // A: the mapping list   — the project
+    PANIC    = 9,   // A: ALL NOTES OFF
+    TEST     = 10,  // A: C-4 CH 1
 };
 
 // ⚠️ ROWS MAY BE INSERTED AND REMOVED HERE, unlike PROJECT's: nothing in the tree stores a MIDI row
 // index. `settings.json` and the `.ptp` key rows by NAME, `ptdispatch` drives them by enumerator,
 // `p3-input.txt` has no MIDI line at all, and the cursor is clamped to `MIDI_ROW_COUNT` on every move.
-// The order is the grouping: the cable and the keyboard (settings.json), then the song, then actions.
-constexpr int MIDI_ROW_COUNT = 10;
+// The order is the grouping: the cable, then how a keyboard plays, then actions.
+constexpr int MIDI_ROW_COUNT = 11;
 
-/** One blank row after PROG CHG: the values end, the actions begin. */
-inline bool midi_row_gap_after(MidiRow row) { return row == MidiRow::PROG_CHG; }
+/** A blank row before the keyboard's rows, and another before the actions. */
+inline bool midi_row_gap_after(MidiRow row) { return row == MidiRow::PROG_CHG || row == MidiRow::VELOCITY; }
 
 /** How far down the panel a MIDI row is drawn, in pixels from the first row's top. */
 inline int midi_row_offset_y(MidiRow target, int rowHeight) {

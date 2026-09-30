@@ -92,7 +92,7 @@ std::string ctl_ch_text(const MidiState& s) {
 
 /** The KEYS row: one voice is MONO, more is POLY and how many tracks a chord may take. */
 std::string keys_text(int voices) {
-    return voices <= 1 ? "MONO  CURSOR TRACK" : "POLY " + std::to_string(voices) + "  FROM CURSOR";
+    return voices <= 1 ? "MONO" : "POLY " + std::to_string(voices);
 }
 
 /**
@@ -161,8 +161,9 @@ void MidiModule::draw(Canvas& c, int x, int y, const MidiState& s) const {
     // and nothing else on the machine knows it. On ALL, and on the channel that matches, there is
     // nothing to report — the same pixel-budget argument as OUTPUT's port count two rows up.
     row_of(MidiRow::CTL_CH,   "CTL CH", ctl_ch_text(s));
-    row_of(MidiRow::KEYS,     "KEYS",     keys_text(s.settings.midiInVoices));
     row_of(MidiRow::PROG_CHG, "PROG CHG", s.project.midiSendProgramChange ? "ON" : "OFF");
+    row_of(MidiRow::KEYS,     "KEYS",     keys_text(s.settings.midiInVoices));
+    row_of(MidiRow::VELOCITY, "VELOCITY", s.settings.midiVelocity ? "ON" : "OFF");
 
     // The three action rows. Drawn like PROJECT's SYSTEM and EXIT, because they are the same kind of
     // thing: a row whose whole content is what A does on it.
@@ -246,6 +247,9 @@ CursorContext MidiModule::cursor_context(const MidiState& s) const {
 
         case MidiRow::PROG_CHG:
             return cc::toggle_binary(s.project.midiSendProgramChange);
+
+        case MidiRow::VELOCITY:
+            return cc::toggle_binary(s.settings.midiVelocity);
 
         // The action rows. Read-only to the generic edit path; plain A is the whole of their behaviour
         // and the dispatcher owns it — it is the only layer that can reach a cable, and the only one
@@ -334,6 +338,11 @@ MidiInputResult MidiModule::handle_input(songcore::Project& project, SettingsVal
         // Read by the frame loop every tick, so nothing is pushed from here.
         case MidiRow::KEYS:
             if (isSet) settings.midiInVoices = clamp(action.value, 0, 7) + 1;
+            break;
+
+        // Read by the frame loop every tick, like KEYS.
+        case MidiRow::VELOCITY:
+            if (isSet) settings.midiVelocity = (action.value != 0);
             break;
 
         case MidiRow::PROG_CHG:

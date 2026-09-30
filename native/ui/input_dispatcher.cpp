@@ -31,7 +31,8 @@ void InputDispatcher::set_now(long long now_ms) {
     // What a live MIDI key plays: the instrument the UI is on, on the SONG cursor's track — the
     // remembered one while another screen is up — over KEYS' voices. Every frame, because a cursor
     // has no change notification; the host republishes only when it changed.
-    host_.set_midi_in_play(s_.currentInstrument, pointer_track(s_), s_.settings.midiInVoices);
+    host_.set_midi_in_play(s_.currentInstrument, pointer_track(s_), s_.settings.midiInVoices,
+                           s_.settings.midiVelocity);
     run_midi_learn();                   // …or, with R held, was pointed at the cell under the cursor
     // The cable reporting which channel its knobs are on — one copy a frame, for a screen that is
     // built in two places and can ask no host of its own.

@@ -384,6 +384,7 @@ struct MidiRoute {
     int16_t  instrumentCount;              // ids at or past this resolve to nothing
     int8_t   controlChannel;               // the CTL CH row: 0-15, MIDI_CTL_CH_ALL, or -1 for none
     uint8_t  learnArmed;                   // R is held: a knob on the control channel names, never drives
+    uint8_t  velocity;                     // 0 = every key plays at full strength
     uint64_t claimed[2];                   // bit per controller number: a mapping would drive it
     MidiRouteInstrument ins[POOL_INSTRUMENTS];
 
@@ -401,7 +402,7 @@ struct MidiRoute {
  * the tracks exactly as it did before the mapping existed.
  */
 inline MidiRoute build_midi_route(const Project& p, int instrument, int baseTrack, int voices,
-                                  int controlChannel, bool learnArmed) {
+                                  int controlChannel, bool learnArmed, bool velocity = true) {
     MidiRoute r{};
     r.instrument      = static_cast<int16_t>(instrument);
     r.baseTrack       = static_cast<int8_t>(baseTrack < 0 ? 0 : (baseTrack >= POOL_TRACKS ? POOL_TRACKS - 1 : baseTrack));
@@ -410,6 +411,7 @@ inline MidiRoute build_midi_route(const Project& p, int instrument, int baseTrac
                                                  ? p.instruments.size() : static_cast<size_t>(POOL_INSTRUMENTS));
     r.controlChannel  = static_cast<int8_t>(controlChannel);
     r.learnArmed      = learnArmed ? 1 : 0;
+    r.velocity        = velocity ? 1 : 0;
     for (int i = 0; i < r.instrumentCount; ++i) {
         const Instrument& ins = p.instruments[static_cast<size_t>(i)];
         r.ins[i].volume   = hex_to_float(ins.volume);
@@ -600,8 +602,9 @@ class MidiInputRouter {
             // consumer that read them is a bug this file has had once; a live key has a real velocity
             // byte and a real V column equivalent, so it uses the sequencer's exact arrangement — and
             // `midi_velocity` then reproduces the byte the keyboard sent, scaled by instrument volume.
-            const float unit = static_cast<float>(msg.data2) / 127.0f;
-            n.velocity    = static_cast<int8_t>(msg.data2);
+            const uint8_t vel  = route_->velocity ? msg.data2 : 127;
+            const float   unit = static_cast<float>(vel) / 127.0f;
+            n.velocity    = static_cast<int8_t>(vel);
             n.velGainBits = f32_bits(unit * unit);
             n.volGainBits = f32_bits(ins.volume);
             n.panBits     = f32_bits(ins.pan);

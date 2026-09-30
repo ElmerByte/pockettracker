@@ -390,6 +390,8 @@ enum class HelpTopic {
     GROOVE_QNT,
     GROOVE_SWG,
 
+    MIDI_VELOCITY,
+
     COUNT
 };
 
@@ -2201,6 +2203,14 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "not this panel, so setting QNT",
       "does not move it."},
      {"Nothing - it only reports"}},
+
+    /* MIDI_VELOCITY */
+    {"VELOCITY: key strength", "ON: a harder key plays", "louder. OFF: every key is full.",
+     {"ON follows how hard each key is",
+      "pressed. OFF plays every key at",
+      "full strength, whatever the",
+      "keyboard sends."},
+     {"A+D-PAD turns it on or off"}},
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────
@@ -2628,6 +2638,7 @@ inline HelpTopic midi_cell_topic(int row) {
         case MidiRow::CTL_CH:   return HelpTopic::MIDI_CTL_CH;
         case MidiRow::KEYS:     return HelpTopic::MIDI_KEYS;
         case MidiRow::PROG_CHG: return HelpTopic::MIDI_PROG_CHG;
+        case MidiRow::VELOCITY: return HelpTopic::MIDI_VELOCITY;
         case MidiRow::MAPPING:  return HelpTopic::MIDI_MAPPING;
         case MidiRow::PANIC:    return HelpTopic::MIDI_PANIC;
         case MidiRow::TEST:     return HelpTopic::MIDI_TEST;

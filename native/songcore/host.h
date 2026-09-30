@@ -159,11 +159,13 @@ class SongcoreHost {
      * the drain with the next route the poll publishes.
      */
     /** What a live key plays: `instrument` on `track` (the SONG cursor's), over `voices` tracks
-     *  (1 = MONO). Published to the drain by the next poll, and only when it changed. */
-    void set_midi_in_play(int instrument, int track, int voices) {
+     *  (1 = MONO), and whether the key's velocity counts. Published to the drain by the next poll,
+     *  and only when it changed. */
+    void set_midi_in_play(int instrument, int track, int voices, bool velocity = true) {
         midiInInstrument_ = instrument;
         midiInTrack_      = track;
         midiInVoices_     = voices;
+        midiInVelocity_   = velocity;
     }
 
     /**
@@ -1624,7 +1626,7 @@ class SongcoreHost {
      */
     void arm_midi_in() {
         const MidiRoute route = build_midi_route(project_, midiInInstrument_, midiInTrack_, midiInVoices_,
-                                                 controlChannel_, learnArmed_);
+                                                 controlChannel_, learnArmed_, midiInVelocity_);
         if (!midiRoutePublished_ || std::memcmp(&route, &midiRouteLast_, sizeof route) != 0) {
             midiIn_.publish_route(route);
             midiRouteLast_      = route;
@@ -1771,6 +1773,7 @@ class SongcoreHost {
     int               midiInInstrument_   = -1;   // the instrument the UI is on
     int               midiInTrack_        = 0;    // the SONG cursor's track
     int               midiInVoices_       = 1;    // 1 = MONO
+    bool              midiInVelocity_     = true;
     IMidiInObserver*  midiInObserver_     = nullptr;
     // `midiInThru_` defaults to the FEATURE — see set_midi_in_thru.
     bool              midiInThru_ = true;

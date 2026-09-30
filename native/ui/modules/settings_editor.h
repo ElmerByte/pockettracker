@@ -232,6 +232,8 @@ struct SettingsValues {
     // How a live key plays: 1 = MONO on the SONG cursor's track, 2..8 = POLY over that many tracks
     // from it. The instrument is the one the UI is on.
     int         midiInVoices = 4;
+    // OFF plays every live key at full strength, whatever the keyboard sends.
+    bool        midiVelocity = true;
 
     // ⚠️ VISUALIZER is NOT here. It lives on the THEME (`Theme::visualizerType`), which is where
     // Kotlin keeps it too — and not by accident: the oscilloscope reads it off the theme it is already
