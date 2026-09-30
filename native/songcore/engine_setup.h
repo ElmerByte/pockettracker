@@ -53,13 +53,17 @@ template <typename Engine>
 bool load_synth_wave(Engine& engine, const Instrument& ins) {
     constexpr int cycle = 1024;
     std::array<float, cycle + 1> pcm{};
+    const float ratio = 1.0f + 7.0f * std::max(0, std::min(255, ins.synthSync)) / 255.0f;
     for (int i = 0; i <= cycle; ++i) {
         const float phase = static_cast<float>(i % cycle) / cycle;
+        // The master is the note's normal oscillator period. A faster slave is reset at each master
+        // boundary; fractional ratios create the hard edge and harmonics of oscillator hard sync.
+        const float slave = ins.synthSync == 0 ? phase : std::fmod(phase * ratio, 1.0f);
         switch (ins.synthWave) {
-            case 1: pcm[i] = 1.0f - 4.0f * std::abs(phase - 0.5f); break;
-            case 2: pcm[i] = 2.0f * phase - 1.0f; break;
-            case 3: pcm[i] = phase < 0.5f ? 1.0f : -1.0f; break;
-            default: pcm[i] = std::sin(6.28318530718f * phase); break;
+            case 1: pcm[i] = 1.0f - 4.0f * std::abs(slave - 0.5f); break;
+            case 2: pcm[i] = 2.0f * slave - 1.0f; break;
+            case 3: pcm[i] = slave < 0.5f ? 1.0f : -1.0f; break;
+            default: pcm[i] = std::sin(6.28318530718f * slave); break;
         }
     }
     return engine.loadSample(ins.sampleId, pcm.data(), static_cast<int>(pcm.size()));

@@ -2459,6 +2459,7 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
             if (row == 8) return column == 1 ? HelpTopic::INST_FILTER_FREQ : HelpTopic::INST_FILTER_RES;
             if (row == 9) return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
             if (row == 10) return HelpTopic::INST_EQ;
+            if (row == 11 && column == 1) return HelpTopic::INST_DRIVE;
             return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }

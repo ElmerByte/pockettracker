@@ -207,6 +207,9 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
                       hex2(ins.delaySend), s.cursorRow, s.cursorColumn, 9, t);
     rowY += ROW_HEIGHT;
     draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 10, t);
+    rowY += ROW_HEIGHT;
+    draw_dual_row(c, rowY, nameX, valueX, "DRIVE", hex2(ins.drive),
+                  "SYNC", hex2(ins.synthSync), s.cursorRow, s.cursorColumn, 11, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -482,6 +485,8 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         if (row == 10 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
+        if (row == 11 && col == 1) return cc::hex_byte(ins.drive, 0, 255);
+        if (row == 11 && col == 3) return cc::hex_byte(ins.synthSync, 0, 255);
         return cc::none();
     }
 
@@ -710,6 +715,7 @@ songcore::MapTarget InstrumentEditorModule::map_target(const InstrumentEditorSta
         if (row == 8 && col == 3) return {MapDestId::INS_RES, 0};
         if (row == 9 && col == 1) return {MapDestId::INS_REV, 0};
         if (row == 9 && col == 3) return {MapDestId::INS_DLY, 0};
+        if (row == 11 && col == 1) return {MapDestId::INS_DRIVE, 0};
         return {};
     }
 
@@ -778,6 +784,10 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;
+        } else if (row == 11 && col == 1) {
+            b255(ins.drive);
+        } else if (row == 11 && col == 3) {
+            b255(ins.synthSync);
         }
         r.modified = (action.type != ActionType::NONE);
         return r;

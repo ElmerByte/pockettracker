@@ -528,6 +528,7 @@ struct Instrument {
     std::vector<ModSlot> modSlots = std::vector<ModSlot>(4);  // Array<ModSlot>(4)
     InstrumentType instrumentType = InstrumentType::SAMPLER;
     int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square
+    int synthSync = 0; // 0 off; 1..255 hard-sync slave/master ratio (1..8)
     std::optional<std::string> soundfontPath;    // null
     int sfBank = 0, sfPreset = 0;
     SFOverrides sfOverrides{};

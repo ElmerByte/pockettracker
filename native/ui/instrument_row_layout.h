@@ -117,6 +117,7 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
     InstrumentRowKind::SPACER, InstrumentRowKind::DUAL,
     InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
     InstrumentRowKind::SINGLE,
+    InstrumentRowKind::DUAL, // DRIVE + SYNC
 };
 
 inline constexpr int INSTRUMENT_ROWS_SAMPLER_COUNT =
