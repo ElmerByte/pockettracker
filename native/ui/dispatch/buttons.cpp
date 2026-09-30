@@ -86,6 +86,8 @@ void InputDispatcher::on_button_a() {
     // or insert a chain on a screen the user cannot even see.
     if (eq_open()) return;
 
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) return;
+
     // A on a cell that OPENS a sub-screen — the two NAME rows and all five EQ cells. Runs BEFORE the
     // per-screen arms below, exactly as Kotlin's `openSubScreenAtCursor(peek = false)` does, because
     // those cells have nothing to insert and the sample editor's EQ cell would otherwise run its FX
@@ -230,6 +232,11 @@ void InputDispatcher::on_button_b() {
     // the slot cycle would be unreachable: B+LEFT would close the editor on B's own press and the LEFT
     // would land on the mixer behind it.
     if (eq_open()) { close_eq_editor(); return; }
+
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+        s_.currentScreen = ScreenType::INSTRUMENT;
+        return;
+    }
 
     if (on_browser()) {
         FileBrowserState& fb = s_.fileBrowser;

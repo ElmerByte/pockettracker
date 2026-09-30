@@ -2332,6 +2332,7 @@ inline HelpTopic help_screen_topic(ScreenType screen) {
         case ScreenType::FILE_BROWSER:  return HelpTopic::SCREEN_FILE_BROWSER;
         case ScreenType::SETTINGS:      return HelpTopic::SCREEN_SETTINGS;
         case ScreenType::SAMPLE_EDITOR: return HelpTopic::SCREEN_SAMPLE_EDITOR;
+        case ScreenType::ENVELOPE_EDITOR: return HelpTopic::SCREEN_MODS;
         case ScreenType::MIDI:          return HelpTopic::SCREEN_MIDI;
         case ScreenType::MIDI_MAP:      return HelpTopic::SCREEN_MIDI_MAP;
     }
@@ -2456,10 +2457,8 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
             if (row <= 3) return instrument_sample_topic(false, row, column);
             if (row == 7) return column == 3 ? HelpTopic::INST_FILTER : HelpTopic::NONE;
             if (row == 8) return column == 1 ? HelpTopic::INST_FILTER_FREQ : HelpTopic::INST_FILTER_RES;
-            if (row == 9) return column == 1 ? HelpTopic::MOD_ATTACK : HelpTopic::MOD_DECAY;
-            if (row == 10) return column == 1 ? HelpTopic::MOD_SUSTAIN : HelpTopic::MOD_RELEASE;
-            if (row == 11) return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
-            if (row == 12) return HelpTopic::INST_EQ;
+            if (row == 9) return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
+            if (row == 10) return HelpTopic::INST_EQ;
             return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }

@@ -29,6 +29,7 @@
 #include "ui/modules/chain_editor.h"
 #include "ui/modules/confirm_dialog.h"
 #include "ui/modules/effects_editor.h"
+#include "ui/modules/envelope_editor.h"
 #include "ui/modules/eq_editor.h"
 #include "ui/modules/file_browser.h"
 #include "ui/modules/groove_editor.h"
@@ -178,6 +179,7 @@ private:
     NavigationMapModule   navigationMap_;
     FileBrowserModule     fileBrowser_;   // full-screen: draw() returns before the furniture
     SampleEditorModule    sampleEditor_;  // full-screen too — a waveform wants the width
+    EnvelopeEditorModule  envelopeEditor_;
     QwertyKeyboardOverlay qwerty_;        // modal: drawn LAST, over everything, including the browser
     EqModule              eq_;            // stateful (curve cache); drawn INSTEAD of the screen module
     ThemeEditorModule     themeEditor_;   // drawn INSTEAD of the screen module, on the EQ's terms (S9)

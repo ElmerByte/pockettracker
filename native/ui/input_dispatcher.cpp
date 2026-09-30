@@ -320,6 +320,9 @@ GrooveState InputDispatcher::groove_state(const Project& p) const {
 
 CursorContext InputDispatcher::cursor_context() const {
     const Project& p = *s_.project;
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR)
+        return envelope_.cursor_context(p.instruments[static_cast<size_t>(s_.currentInstrument)],
+                                        s_.envelopeSlot, s_.envelopeCursor);
     switch (s_.currentScreen) {
         case ScreenType::SONG: {
             SongEditorState ss{p};
@@ -451,6 +454,10 @@ CursorContext InputDispatcher::cursor_context() const {
 
 bool InputDispatcher::apply_edit(const InputAction& action) {
     Project& p = host_.edit_project();  // the SAME Project the Sequencer is reading
+
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR)
+        return envelope_.handle_input(p.instruments[static_cast<size_t>(s_.currentInstrument)],
+                                      s_.envelopeSlot, s_.envelopeCursor, action);
 
     switch (s_.currentScreen) {
         case ScreenType::SONG: {
@@ -674,7 +681,8 @@ void InputDispatcher::mark_modified(bool table_touched) {
     // them as a voice runs. Turn the filter while a pad rings and you must hear it turn. Nothing on the
     // event path pushes them (a note re-pushes the mods and sends, but not these), so the edit says so
     // here — the same call Kotlin's InstrumentController.updateDrive makes.
-    if (on_instrument_screen()) host_.push_instrument(s_.currentInstrument);
+    if (on_instrument_screen() || s_.currentScreen == ScreenType::ENVELOPE_EDITOR)
+        host_.push_instrument(s_.currentInstrument);
 
     // The same argument one level up: the MIXER and EFFECTS screens edit state the engine holds ON ITS
     // OWN BEHALF — the mixer, the master bus, both send buses, the master EQ. None of it is a note, so
@@ -954,6 +962,9 @@ void InputDispatcher::on_dpad_up() {
     if (theme_open())  { theme_move_cursor(-1, 0); return; }
     if (eq_open())     { eq_move_cursor(0, -1); return; }
     if (on_browser())  { browser_move_cursor(-1, /*page=*/false); return; }
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+        s_.envelopeCursor = std::max(0, s_.envelopeCursor - 2); return;
+    }
     dpad_nav(NavDir::UP);
 }
 
@@ -965,6 +976,9 @@ void InputDispatcher::on_dpad_down() {
     if (theme_open())  { theme_move_cursor(+1, 0); return; }
     if (eq_open())     { eq_move_cursor(0, +1); return; }
     if (on_browser())  { browser_move_cursor(+1, /*page=*/false); return; }
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+        s_.envelopeCursor = std::min(4, s_.envelopeCursor + 2); return;
+    }
     dpad_nav(NavDir::DOWN);
 }
 
@@ -980,6 +994,9 @@ void InputDispatcher::on_dpad_left() {
     if (eq_open())     { eq_move_cursor(-1, 0); return; }
     // LEFT/RIGHT PAGE the browser by a screenful — the one list in the app long enough to need it.
     if (on_browser())  { browser_move_cursor(-BROWSER_VISIBLE_ROWS, /*page=*/true); return; }
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+        s_.envelopeCursor = std::max(0, s_.envelopeCursor - 1); return;
+    }
     dpad_nav(NavDir::LEFT);
 }
 
@@ -989,6 +1006,9 @@ void InputDispatcher::on_dpad_right() {
     if (theme_open())  { theme_move_cursor(0, +1); return; }
     if (eq_open())     { eq_move_cursor(+1, 0); return; }
     if (on_browser())  { browser_move_cursor(+BROWSER_VISIBLE_ROWS, /*page=*/true); return; }
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+        s_.envelopeCursor = std::min(4, s_.envelopeCursor + 1); return;
+    }
     dpad_nav(NavDir::RIGHT);
 }
 

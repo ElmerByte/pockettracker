@@ -111,6 +111,8 @@ struct AppState {
     // ui/instrument_row_layout.h, and the cursor walks that rather than a range.
     int instrumentCursorRow    = 0;
     int instrumentCursorColumn = 1;
+    int envelopeCursor = 0; // ATK, DEC, SUS, REL, AMT
+    int envelopeSlot = 0;   // 0 = synth volume, 1 = synth filter cutoff
 
     /** INST.POOL. The pool's ROW is `currentInstrument` itself, so only the column lives here (0..4). */
     int poolCursorColumn = 0;
@@ -678,6 +680,7 @@ inline bool modal_backdrop_active(const AppState& s) {
  */
 inline bool full_screen_module(const AppState& s) {
     return s.currentScreen == ScreenType::FILE_BROWSER ||
+           s.currentScreen == ScreenType::ENVELOPE_EDITOR ||
            (s.currentScreen == ScreenType::SAMPLE_EDITOR && !s.eq.isOpen);
 }
 

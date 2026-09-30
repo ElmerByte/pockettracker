@@ -30,6 +30,7 @@ enum class ScreenType {
     FILE_BROWSER,
     SETTINGS,
     SAMPLE_EDITOR,
+    ENVELOPE_EDITOR,
 
     // ⚠️ MIDI is APPENDED, not slotted in beside SETTINGS where it belongs by kind. This enum has no
     // counterpart in ScreenType.kt any more (Phase E deleted it), but `screen_column()` and the nav
@@ -56,6 +57,7 @@ inline const char* screen_label(ScreenType s) {
         case ScreenType::FILE_BROWSER:  return "FILE BROWSER";
         case ScreenType::SETTINGS:      return "SETTINGS";
         case ScreenType::SAMPLE_EDITOR: return "SAMPLE EDITOR";
+        case ScreenType::ENVELOPE_EDITOR: return "ENVELOPE EDITOR";
         case ScreenType::MIDI:          return "MIDI";
         case ScreenType::MIDI_MAP:      return "MIDI MAPPING";
     }
@@ -86,6 +88,7 @@ inline const char* screen_short_label(ScreenType s) {
         case ScreenType::FILE_BROWSER:  return "FB";
         case ScreenType::SETTINGS:      return "SE";
         case ScreenType::SAMPLE_EDITOR: return "SE";
+        case ScreenType::ENVELOPE_EDITOR: return "ENV";
         case ScreenType::MIDI:          return "MI";
         case ScreenType::MIDI_MAP:      return "MM";
     }

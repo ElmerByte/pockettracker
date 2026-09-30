@@ -116,7 +116,6 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
     InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
     InstrumentRowKind::SPACER, InstrumentRowKind::DUAL,
     InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
-    InstrumentRowKind::DUAL, InstrumentRowKind::DUAL,
     InstrumentRowKind::SINGLE,
 };
 
@@ -165,14 +164,14 @@ inline bool instrument_has_source_row(songcore::InstrumentType type) {
 /**
  * The rightmost cursor column on row 0 — the cap the NAME row's LEFT/RIGHT stepping honours.
  *
- * 3 on a sampler (TYPE, LOAD, EDIT), 2 on a SoundFont (no single waveform to edit), 1 on EXTERNAL
- * (no source at all). Read off the drawn row: a cursor past the cap sits on a cell that is not drawn.
+ * 3 on a sampler (TYPE, LOAD, EDIT) or synth (TYPE, AMP, FILT), 2 on a SoundFont
+ * (TYPE, LOAD), 1 on EXTERNAL (TYPE only). A cursor past the cap has no drawn cell.
  */
 inline int instrument_name_row_max_column(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return 2;
         case songcore::InstrumentType::EXTERNAL:  return 1;
-        case songcore::InstrumentType::SYNTH:     return 1;
+        case songcore::InstrumentType::SYNTH:     return 3;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return 3;
@@ -211,7 +210,7 @@ inline int instrument_eq_row(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return 14;
         case songcore::InstrumentType::EXTERNAL:  return -1;
-        case songcore::InstrumentType::SYNTH:     return 12;
+        case songcore::InstrumentType::SYNTH:     return 10;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return 12;

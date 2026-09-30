@@ -82,6 +82,7 @@
 #include "ui/modules/groove_editor.h"
 #include "ui/modules/scale_editor.h"
 #include "ui/modules/instrument_editor.h"
+#include "ui/modules/envelope_editor.h"
 #include "ui/modules/instrument_pool.h"
 #include "ui/modules/midi_map_editor.h"
 #include "ui/modules/midi_settings.h"
@@ -790,6 +791,7 @@ class InputDispatcher {
     GrooveModule           groove_{};
     ScaleModule            scale_{};
     InstrumentEditorModule instrument_{};
+    EnvelopeEditorModule envelope_{};
     InstrumentPoolModule   pool_{};
     ModulationModule       mods_{};
     MixerModule            mixer_{};

@@ -40,11 +40,6 @@ int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
  */
 std::string midi_opt(int v) { return v < 0 ? "--" : hex2(v); }
 
-const songcore::ModSlot& synth_amp(const Instrument& ins) {
-    static const songcore::ModSlot empty{};
-    return ins.modSlots.empty() ? empty : ins.modSlots[0];
-}
-
 }  // namespace
 
 // ─── Draw ────────────────────────────────────────────────────────────────────────────────────────
@@ -208,17 +203,10 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     draw_dual_row(c, rowY, nameX, valueX, "FREQ", hex2(ins.filterCut), "RES",
                   hex2(ins.filterRes), s.cursorRow, s.cursorColumn, 8, t);
     rowY += ROW_HEIGHT;
-    const auto& amp = synth_amp(ins);
-    draw_dual_row(c, rowY, nameX, valueX, "ATK", hex2(amp.attack), "DEC",
-                  hex2(amp.decay), s.cursorRow, s.cursorColumn, 9, t);
-    rowY += ROW_HEIGHT;
-    draw_dual_row(c, rowY, nameX, valueX, "SUS", hex2(amp.sustain), "REL",
-                  hex2(amp.release), s.cursorRow, s.cursorColumn, 10, t);
-    rowY += ROW_HEIGHT;
     draw_dual_row(c, rowY, nameX, valueX, "REV", hex2(ins.reverbSend), "DEL",
-                  hex2(ins.delaySend), s.cursorRow, s.cursorColumn, 11, t);
+                      hex2(ins.delaySend), s.cursorRow, s.cursorColumn, 9, t);
     rowY += ROW_HEIGHT;
-    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 12, t);
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 10, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -389,14 +377,15 @@ void InstrumentEditorModule::draw_type_load_row(Canvas& c, int x, int y, int nam
 
     // ⚠️ Both buttons are drawn only where they DO something, and `instrument_row_layout.h` caps the
     // cursor at the same numbers — one table, so a button that is not drawn is also not reachable.
-    // No LOAD on EXTERNAL: it has no source file of any kind, only a channel and a patch number.
-    // No EDIT on a SoundFont: there is no single waveform to edit.
+    // EXTERNAL has no second button; SYNTH uses both for envelope editors.
     const int maxCol = instrument_name_row_max_column(type);
     if (maxCol >= 2) {
-        draw_cursor_cell(c, "LOAD", x + BTN_COL2, textY, c2, t.textValue, t);
+        draw_cursor_cell(c, type == InstrumentType::SYNTH ? "AMP >" : "LOAD",
+                         x + BTN_COL2, textY, c2, t.textValue, t);
     }
     if (maxCol >= 3) {
-        draw_cursor_cell(c, "EDIT >", x + BTN_COL3, textY, c3, t.textValue, t);
+        draw_cursor_cell(c, type == InstrumentType::SYNTH ? "FILT >" : "EDIT >",
+                         x + BTN_COL3, textY, c3, t.textValue, t);
     }
 }
 
@@ -487,18 +476,10 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
             if (col == 3) return cc::hex_byte(ins.filterRes, 0, 255);
         }
         if (row == 9) {
-            if (col == 1) return cc::hex_byte(synth_amp(ins).attack, 0, 255, -1, false, false, false, 0);
-            if (col == 3) return cc::hex_byte(synth_amp(ins).decay, 0, 255, -1, false, false, false, 0);
-        }
-        if (row == 10) {
-            if (col == 1) return cc::hex_byte(synth_amp(ins).sustain, 0, 255, -1, false, false, false, 255);
-            if (col == 3) return cc::hex_byte(synth_amp(ins).release, 0, 255, -1, false, false, false, 6);
-        }
-        if (row == 11) {
             if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255);
             if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255);
         }
-        if (row == 12 && col == 1)
+        if (row == 10 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
         return cc::none();
@@ -727,8 +708,8 @@ songcore::MapTarget InstrumentEditorModule::map_target(const InstrumentEditorSta
     if (s.type() == InstrumentType::SYNTH && row >= 7) {
         if (row == 8 && col == 1) return {MapDestId::INS_CUT, 0};
         if (row == 8 && col == 3) return {MapDestId::INS_RES, 0};
-        if (row == 11 && col == 1) return {MapDestId::INS_REV, 0};
-        if (row == 11 && col == 3) return {MapDestId::INS_DLY, 0};
+        if (row == 9 && col == 1) return {MapDestId::INS_REV, 0};
+        if (row == 9 && col == 3) return {MapDestId::INS_DLY, 0};
         return {};
     }
 
@@ -790,25 +771,10 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         } else if (row == 8) {
             if (col == 1) b255(ins.filterCut);
             if (col == 3) b255(ins.filterRes);
-        } else if (row == 9 || row == 10) {
-            if (isSet && (col == 1 || col == 3)) {
-                if (ins.modSlots.empty()) ins.modSlots.resize(4);
-                auto& amp = ins.modSlots[0];
-                if (amp.type != songcore::ModType::ADSR || amp.dest != songcore::ModDest::VOLUME) {
-                    amp = songcore::ModSlot{};
-                    amp.type = songcore::ModType::ADSR;
-                    amp.dest = songcore::ModDest::VOLUME;
-                    amp.sustain = 255;
-                    amp.release = 6;
-                }
-                int& field = row == 9 ? (col == 1 ? amp.attack : amp.decay)
-                                      : (col == 1 ? amp.sustain : amp.release);
-                field = clamp(v, 0, 255);
-            }
-        } else if (row == 11) {
+        } else if (row == 9) {
             if (col == 1) b255(ins.reverbSend);
             if (col == 3) b255(ins.delaySend);
-        } else if (row == 12 && col == 1) {
+        } else if (row == 10 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;

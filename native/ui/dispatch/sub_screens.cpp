@@ -147,12 +147,19 @@ bool InputDispatcher::instrument_open_at_cursor() {
     const int         row  = s_.instrumentCursorRow;
     const int         col  = s_.instrumentCursorColumn;
 
-    // Row 0 — TYPE (col 1) + the SOURCE buttons. LOAD (col 2) browses for a sample / SoundFont; EDIT
-    // (col 3) opens the sample editor. (The instrument PRESET save/load lives on row 5 now.)
+    // Row 0 — TYPE (col 1), LOAD or synth AMP (col 2), and sampler EDIT or synth FILT (col 3).
+    // The instrument PRESET save/load lives on row 5.
     //
     // ⚠️ Neither button exists on EXTERNAL — it draws neither and the cursor caps at column 1 — so
     // this is the same belt-and-braces consume the SF's EDIT arm below is: unreachable by the D-pad,
     // and refusing here rather than opening a browser for a source that does not exist.
+    if (row == 0 && (col == 2 || col == 3) &&
+        ins.instrumentType == songcore::InstrumentType::SYNTH) {
+        s_.envelopeCursor = 0;
+        s_.envelopeSlot = col - 2;
+        s_.currentScreen = ScreenType::ENVELOPE_EDITOR;
+        return true;
+    }
     if (row == 0 && col >= 2 && !instrument_has_source_row(ins.instrumentType)) return true;
 
     if (row == 0 && col == 2) {
