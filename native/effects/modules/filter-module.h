@@ -15,7 +15,7 @@
 //
 // Parameters (all stored so modulation paths only need to pass changed ones):
 //   type  0-5   filter type (see above)
-//   cut   0-255 cutoff frequency   → 20–20 kHz exponential
+//   cut   0-255 cutoff frequency   → 20–20 kHz exponential, capped at 0.2× sample rate
 //   res   0-255 resonance          → 0..1 (0=none, 255=max)
 //   drive 0-255 SVF resonance saturation → SetDrive 0-10
 //              128 = DaisySP Init default (pre_drive=0.5)
@@ -69,9 +69,12 @@ struct FilterModule {
             svfL.Init(sr);
             svfR.Init(sr);
         }
-        // cutoff 0-255 → Hz, exponential curve (20 Hz – 20 kHz)
+        // cutoff 0-255 → Hz, exponential curve (20 Hz – 20 kHz before the safety cap)
         float hz  = 20.0f * powf(1000.0f, cutoff / 255.0f);
-        hz = fminf(hz, sr * 0.45f);
+        // The SVF's cubic resonance feedback can diverge on full-scale waves at
+        // high cutoff even though SetFreq itself accepts frequencies up to sr/3.
+        // Keep the top of the sweep below that unstable region.
+        hz = fminf(hz, sr * 0.20f);
         // resonance 0-255 → 0..1
         float res = resonance / 255.0f;
         // drive 0-255 → 0..10 (DaisySP SetDrive input range)
