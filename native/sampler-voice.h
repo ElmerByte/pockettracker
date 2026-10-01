@@ -44,6 +44,10 @@ struct Voice : public IAudioVoice {
     double synthPhase2 = 0.0;
     synth::Noise synthNoise1{1}, synthNoise2{2};
     float synthMix = 0.0f;
+    std::array<double, 3> synthChordPhase1{}, synthChordPhase2{};
+    std::array<synth::Noise, 3> synthChordNoise1{{{3}, {5}, {7}}};
+    std::array<synth::Noise, 3> synthChordNoise2{{{4}, {6}, {8}}};
+    float synthChordBlend = 0.0f;
     int trackId;
     int instrId = -1;        // Instrument index (= sampleId); used for per-instrument spectrum capture
     uint32_t sampleGen = 0;  // AudioEngine::sampleGen[instrId] when triggered; the mix ends a stale one
@@ -176,6 +180,12 @@ struct Voice : public IAudioVoice {
         synthNoise1.trigger(track);
         synthNoise2.trigger(track);
         synthMix = instrParams.synthMix;
+        synthChordBlend = instrParams.synthChordEnabled ? 1.0f : 0.0f;
+        synthChordPhase1.fill(0.0); synthChordPhase2.fill(0.0);
+        for (int n = 0; n < 3; ++n) {
+            synthChordNoise1[n].trigger(track * 3 + n);
+            synthChordNoise2[n].trigger(track * 3 + n);
+        }
         trackId = track;
         playbackRate = rate;
         basePlaybackRate = rate;  // Store original rate for table transpose
@@ -442,6 +452,7 @@ struct Voice : public IAudioVoice {
     void retrigger(int startPoint) override {
         if (!isActive || !sampleData) return;
         synthPhase2 = 0.0;
+        synthChordPhase1.fill(0.0); synthChordPhase2.fill(0.0);
         if (startPoint >= 0 && startPoint <= 255 && sampleLength > 0) {
             // int64 — same overflow as trigger() for long samples
             position = (double)(((int64_t)startPoint * sampleLength) / 255);

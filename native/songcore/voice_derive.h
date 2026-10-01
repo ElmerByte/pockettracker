@@ -28,7 +28,8 @@
 #include "event.h"
 #include "model.h"
 #include "note_tables.h"
-#include "program.h"     // Program + the two derivations, which live below the sequencer
+#include "program.h"
+#include "synth_chord.h"     // Program + the two derivations, which live below the sequencer
 #include "scheduler.h"   // note_to_midi / note_from_midi
 #include "timing.h"      // TICS_PER_STEP
 
@@ -80,6 +81,16 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     p.synthPulseWidth1 = std::clamp(ins.synthPulseWidth1, 0, 255);
     p.synthPulseWidth2 = std::clamp(ins.synthPulseWidth2, 0, 255);
     p.synthSync = std::clamp(ins.synthSync, 0, 255);
+    p.synthChordEnabled = ins.synthChordMode > 0;
+    const auto intervals = synth_chord_intervals(ins);
+    const float spread = std::clamp(ins.synthChordDetune, 0, 255) / 255.0f * 0.25f;
+    const float width = std::clamp(ins.synthChordWidth, 0, 255) / 255.0f;
+    for (int n = 0; n < 3; ++n) {
+        p.synthChordRatio[n] = std::pow(2.0f, (intervals[n] + (n - 1) * spread) / 12.0f);
+        const float pan = 0.5f + (n - 1) * width * 0.5f;
+        p.synthChordLeft[n] = std::cos(pan * 1.57079632679f) * 0.47140452079f;
+        p.synthChordRight[n] = std::sin(pan * 1.57079632679f) * 0.47140452079f;
+    }
     p.slicingMode     = ins.instrumentType == InstrumentType::SYNTH ? 0 : ins.slicingMode;
     p.sliceMarkers    = (ins.instrumentType == InstrumentType::SYNTH || ins.sliceMarkers.empty()) ? nullptr : ins.sliceMarkers.data();
     p.sliceCount      = ins.instrumentType == InstrumentType::SYNTH ? 0 : static_cast<int32_t>(ins.sliceMarkers.size());

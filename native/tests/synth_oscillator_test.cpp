@@ -107,6 +107,6 @@ int main() {
     state.cursorRow = 8; state.cursorColumn = 3;
     assert(editor.handle_input(ins, 8, 3, pt::ui::on_a_b(editor.cursor_context(state))).modified);
     assert(ins.synthDetune2 == 128 && ins.synthMix == 200 && ins.synthWave2 == 2);
-    assert(pt::ui::instrument_fx_row(ins.instrumentType) == 11);
-    assert(pt::ui::instrument_eq_row(ins.instrumentType) == 12);
+    assert(pt::ui::instrument_fx_row(ins.instrumentType) == 14);
+    assert(pt::ui::instrument_eq_row(ins.instrumentType) == 15);
 }

@@ -545,6 +545,10 @@ struct Instrument {
     int synthPulseWidth1 = 128, synthPulseWidth2 = 128; // 80 = 50% duty; sqr only
     int synthMix = 0;       // 0 OSC1 only, 255 OSC2 only
     int synthDetune2 = 128; // 128 in tune; approximately -100..+100 cents
+    int synthChordMode = 0; // off, unison, major, minor, sus4, power, custom
+    int synthChordInterval2 = 4, synthChordInterval3 = 7; // Signed semitones from root
+    int synthChordDetune = 32; // 00..FF -> 0..25 cents spread each way
+    int synthChordWidth = 128; // 00 mono, FF left/center/right
     int synthSync = 0; // 0 off; 1..255 hard-sync slave/master ratio (1..8)
     std::optional<std::string> soundfontPath;    // null
     int sfBank = 0, sfPreset = 0;

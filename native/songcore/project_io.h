@@ -264,6 +264,11 @@ inline Instrument parse_instrument(const json& j, int index) {
     i.synthPulseWidth2 = std::clamp(get_int(j, "synthPulseWidth2", i.synthPulseWidth2), 0, 255);
     i.synthMix = std::clamp(get_int(j, "synthMix", i.synthMix), 0, 255);
     i.synthDetune2 = std::clamp(get_int(j, "synthDetune2", i.synthDetune2), 0, 255);
+    i.synthChordMode = std::clamp(get_int(j, "synthChordMode", i.synthChordMode), 0, 6);
+    i.synthChordInterval2 = std::clamp(get_int(j, "synthChordInterval2", i.synthChordInterval2), -24, 24);
+    i.synthChordInterval3 = std::clamp(get_int(j, "synthChordInterval3", i.synthChordInterval3), -24, 24);
+    i.synthChordDetune = std::clamp(get_int(j, "synthChordDetune", i.synthChordDetune), 0, 255);
+    i.synthChordWidth = std::clamp(get_int(j, "synthChordWidth", i.synthChordWidth), 0, 255);
     i.synthSync = std::max(0, std::min(255, get_int(j, "synthSync", i.synthSync)));
     i.soundfontPath  = get_opt_str(j, "soundfontPath");
     i.sfBank         = get_int(j, "sfBank", i.sfBank);
@@ -752,6 +757,11 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.synthPulseWidth2 != 128) w.field_int("synthPulseWidth2", i.synthPulseWidth2);
     if (i.synthMix != 0) w.field_int("synthMix", i.synthMix);
     if (i.synthDetune2 != 128) w.field_int("synthDetune2", i.synthDetune2);
+    if (i.synthChordMode != 0) w.field_int("synthChordMode", i.synthChordMode);
+    if (i.synthChordInterval2 != 4) w.field_int("synthChordInterval2", i.synthChordInterval2);
+    if (i.synthChordInterval3 != 7) w.field_int("synthChordInterval3", i.synthChordInterval3);
+    if (i.synthChordDetune != 32) w.field_int("synthChordDetune", i.synthChordDetune);
+    if (i.synthChordWidth != 128) w.field_int("synthChordWidth", i.synthChordWidth);
     if (i.synthSync != 0) w.field_int("synthSync", i.synthSync);
     if (i.soundfontPath)    w.field_string("soundfontPath", *i.soundfontPath);
     if (i.sfBank != 0)      w.field_int("sfBank", i.sfBank);

@@ -4,6 +4,7 @@
 
 #include "ui/helpers.h"
 #include "ui/instrument_row_layout.h"
+#include "songcore/synth_chord.h"
 
 namespace pt::ui {
 
@@ -176,9 +177,24 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     draw_dual_row(c, rowY, nameX, valueX, "PW1", hex2(ins.synthPulseWidth1),
                   "PW2", hex2(ins.synthPulseWidth2), s.cursorRow, s.cursorColumn, 10, t);
     rowY += ROW_HEIGHT;
-    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 11, t);
+    draw_dual_row(c, rowY, nameX, valueX, "CHD",
+                  songcore::SYNTH_CHORD_NAMES[clamp(ins.synthChordMode, 0, 6)],
+                  "SPR", hex2(ins.synthChordDetune), s.cursorRow, s.cursorColumn, 11, t);
     rowY += ROW_HEIGHT;
-    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 12, t);
+    const auto intervals = songcore::synth_chord_intervals(ins);
+    const auto intervalText = [](int value) {
+        return std::string(value < 0 ? "-" : "+") +
+            (std::abs(value) < 10 ? "0" : "") + std::to_string(std::abs(value));
+    };
+    draw_dual_row(c, rowY, nameX, valueX, "INT2", intervalText(intervals[1]),
+                  "INT3", intervalText(intervals[2]), s.cursorRow, s.cursorColumn, 12, t);
+    rowY += ROW_HEIGHT;
+    draw_parameter_row(c, rowY, nameX, valueX, "WIDTH", hex2(ins.synthChordWidth), false,
+                       s.cursorRow == 13, t);
+    rowY += ROW_HEIGHT;
+    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 14, t);
+    rowY += ROW_HEIGHT;
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 15, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -447,8 +463,17 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         if (row == 10 && (col == 1 || col == 3))
             return cc::hex_byte(col == 1 ? ins.synthPulseWidth1 : ins.synthPulseWidth2,
                                 0, 255, -1, false, false, false, 128);
-        if (row == 11) return cc::read_only();
-        if (row == 12 && col == 1)
+        if (row == 11 && col == 1) return cc::hex_byte(ins.synthChordMode, 0, 6, -1, false, false, false, 0);
+        if (row == 11 && col == 3) return cc::hex_byte(ins.synthChordDetune, 0, 255, -1, false, false, false, 32);
+        if (row == 12 && (col == 1 || col == 3)) {
+            const auto intervals = songcore::synth_chord_intervals(ins);
+            auto context = cc::transpose(col == 1 ? intervals[1] : intervals[2], false, col == 1 ? 4 : 7);
+            context.minValue = -24; context.maxValue = 24;
+            return context;
+        }
+        if (row == 13 && col == 1) return cc::hex_byte(ins.synthChordWidth, 0, 255, -1, false, false, false, 128);
+        if (row == 14) return cc::read_only();
+        if (row == 15 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
         return cc::none();
@@ -665,7 +690,16 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         else if (row == 8 && col == 3) b255(ins.synthDetune2);
         else if (row == 10 && col == 1) b255(ins.synthPulseWidth1);
         else if (row == 10 && col == 3) b255(ins.synthPulseWidth2);
-        else if (row == 12 && col == 1) {
+        else if (row == 11 && col == 1 && isSet) ins.synthChordMode = clamp(v, 0, 6);
+        else if (row == 11 && col == 3) b255(ins.synthChordDetune);
+        else if (row == 12 && (col == 1 || col == 3) && isSet) {
+            const auto intervals = songcore::synth_chord_intervals(ins);
+            ins.synthChordInterval2 = col == 1 ? clamp(v, -24, 24) : intervals[1];
+            ins.synthChordInterval3 = col == 3 ? clamp(v, -24, 24) : intervals[2];
+            ins.synthChordMode = 6;
+        }
+        else if (row == 13 && col == 1) b255(ins.synthChordWidth);
+        else if (row == 15 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;

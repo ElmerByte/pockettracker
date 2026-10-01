@@ -951,6 +951,14 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         const float detuneEnd = dualOsc ? detuneRatio(voice.modDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
         const float syncRatio = dualOsc ? 1.0f + 7.0f * synthParams->synthSync / 255.0f : 1.0f;
         const float mixStart = voice.synthMix;
+        const float chordTarget = dualOsc && synthParams->synthChordEnabled ? 1.0f : 0.0f;
+        const float chordStart = voice.synthChordBlend;
+        const bool renderChord = dualOsc && (chordTarget > 0.0f || chordStart > 0.0f);
+        if (renderChord && chordStart == 0.0f) {
+            const double phase = voice.position / synth::CYCLE;
+            voice.synthChordPhase1.fill(phase - std::floor(phase));
+            voice.synthChordPhase2.fill(voice.synthPhase2);
+        }
         for (int i = startFrame; i < to; i++) {
             int idx = (int)voice.position;
             // frac computed in double THEN narrowed: (float)idx is inexact past 2^24, which
@@ -1036,6 +1044,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     sample2 = voice.sampleData[quantizedIdx];
                 }
                 float processedSample = sample1 + (sample2 - sample1) * frac;
+                float chordL = 0.0f, chordR = 0.0f;
                 if (dualOsc) {
                     const auto modulation = [&](ParamId parameter) {
                         return voice.prevModDestValues[parameter] +
@@ -1060,9 +1069,36 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                         processedSample = processedSample * (1.0f - blend) + second * blend;
                     }
                     synth::advance(voice.synthPhase2, phaseStep * (detuneStart + (detuneEnd - detuneStart) * t));
+                    if (renderChord) {
+                        const auto oscillator = [&](int wave, double phase, float width, synth::Noise& noise) {
+                            if (wave == synth::NOISE) return noise.sample(effDownsample);
+                            phase -= std::floor(phase);
+                            return wave == 3 ? synth::pulse(phase, width, effDownsample)
+                                             : synth::sample(wave, phase, effDownsample);
+                        };
+                        for (int n = 0; n < 3; ++n) {
+                            const float first = oscillator(synthParams->synthWave,
+                                voice.synthChordPhase1[n] * syncRatio, width1, voice.synthChordNoise1[n]);
+                            const float second = blend > 0.0f ? oscillator(synthParams->synthWave2,
+                                voice.synthChordPhase2[n], width2, voice.synthChordNoise2[n]) : 0.0f;
+                            const float value = first * (1.0f - blend) + second * blend;
+                            chordL += value * synthParams->synthChordLeft[n];
+                            chordR += value * synthParams->synthChordRight[n];
+                            const double step = phaseStep * synthParams->synthChordRatio[n];
+                            synth::advance(voice.synthChordPhase1[n], step);
+                            synth::advance(voice.synthChordPhase2[n], step * (detuneStart + (detuneEnd - detuneStart) * t));
+                        }
+                    }
                 }
                 voice.chain.filter.setInterpolatedCoeffs(t);
-                procL = procR = voice.chain.processMono(processedSample);
+                if (renderChord) {
+                    const float amount = chordStart + (chordTarget - chordStart) * t;
+                    procL = processedSample + (chordL - processedSample) * amount;
+                    procR = processedSample + (chordR - processedSample) * amount;
+                    voice.chain.processStereo(procL, procR);
+                } else {
+                    procL = procR = voice.chain.processMono(processedSample);
+                }
             }
 
             // ── SHARED TAIL: sends → global gain → fade-out → pan ────────────────
@@ -1194,6 +1230,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             }
         } // for (int i = startFrame; i < to; i++)
         voice.synthMix = mixTarget;
+        voice.synthChordBlend = chordTarget;
     };
 
     // ⚠️⚠️ **EACH SAMPLER VOICE RUNS TO THE END OF THE BLOCK BEFORE THE NEXT STARTS, IN PIECES CUT WHERE

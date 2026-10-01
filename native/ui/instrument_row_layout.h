@@ -100,6 +100,9 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
     InstrumentRowKind::DUAL, // OSC2 + DET
     InstrumentRowKind::SINGLE, // MIX
     InstrumentRowKind::DUAL, // PW1 + PW2
+    InstrumentRowKind::DUAL, // CHD + SPR
+    InstrumentRowKind::DUAL, // INT2 + INT3
+    InstrumentRowKind::SINGLE, // WIDTH
     InstrumentRowKind::SINGLE, // FX
     InstrumentRowKind::SINGLE, // EQ
 };
@@ -175,7 +178,7 @@ inline int instrument_sf_offset(songcore::InstrumentType type) {
 /** The FX button is absent on EXTERNAL, which has no internal audio signal. */
 inline int instrument_fx_row(songcore::InstrumentType type) {
     if (type == songcore::InstrumentType::EXTERNAL) return -1;
-    if (type == songcore::InstrumentType::SYNTH) return 11;
+    if (type == songcore::InstrumentType::SYNTH) return 14;
     return type == songcore::InstrumentType::SAMPLER ? 7 : 8;
 }
 
@@ -188,7 +191,7 @@ inline int instrument_eq_row(songcore::InstrumentType type) {
     switch (type) {
         case songcore::InstrumentType::SOUNDFONT: return 9;
         case songcore::InstrumentType::EXTERNAL:  return -1;
-        case songcore::InstrumentType::SYNTH:     return 12;
+        case songcore::InstrumentType::SYNTH:     return 15;
         case songcore::InstrumentType::SAMPLER:   break;
     }
     return 8;

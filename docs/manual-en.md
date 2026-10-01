@@ -619,6 +619,20 @@ synth modulation destinations: MIX adds to the blend, while DET2 moves OSC2's
 detune within its existing range. LFOs swing either way; envelopes move upward.
 These destinations are available for synth instruments. They are ignored by
 noise where they control pulse width or pitch.
+**CHD** adds a three-note oscillator bank inside the synth, using one track and
+one phrase root note. Choose `uni` (unison), `maj`, `min`, `sus` (sus4), `pwr`
+(root/fifth/octave), or `cus`. **INT2 / INT3** are signed decimal semitone offsets
+from the root, from -24 to +24; changing either selects custom mode. Set both to
+`+00` for custom unison, `+04 / +07` for major, or `+03 / +07` for minor.
+**SPR** detunes the outer notes in opposite directions: `00` is exact tuning,
+`FF` is 25 cents each way. **WIDTH** spreads the notes left/center/right:
+`00` is mono and `FF` is full width. Try `uni`, SPR `40`, WIDTH `C0` for a thick pad.
+Each note uses OSC1 and OSC2, including sync, noise, PWM, MIX, and DET2 modulation.
+They share the filter, AMP/FILT envelopes, and FX. Levels are averaged to avoid
+tripling the volume. Pitch effects transpose the entire bank; intervals are
+chromatic offsets from the root, not independently snapped to the track scale.
+`off` preserves the original synth. These extra pitches are internal audio only;
+phrase columns and MIDI output are unchanged.
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.
