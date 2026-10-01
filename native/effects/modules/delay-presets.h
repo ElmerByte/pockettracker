@@ -23,7 +23,7 @@
 struct DelayPreset {
     const char* name;
     bool        pong;     // repeats come back on the other side
-    int         tone;     // 00-FF, FF = fully open (no filter in the regeneration path at all)
+    int         tone;     // 00-FF, FF = fully open (no filter on the repeats at all)
     int         wobble;   // 00-FF, 00 = the read head does not drift
 };
 
