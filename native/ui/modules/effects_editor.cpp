@@ -80,7 +80,8 @@ void EffectModule::draw(Canvas& c, int x, int y, const EffectState& s) const {
     const Theme&             t = s.theme;
     const songcore::Project& p = s.project;
 
-    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    const int panelHeight = c.height() - y - 6;
+    c.fill_rect(x, y, WIDTH, panelHeight, t.background);
 
     // Where every row and every header lands, in one walk. Nothing below counts lines for itself.
     const EffectsLayout lay = effects_layout();
@@ -93,7 +94,7 @@ void EffectModule::draw(Canvas& c, int x, int y, const EffectState& s) const {
     c.draw_text("EFFECTS", x + LABEL_X[0], y + TEXT_PADDING, t.textTitle, CHAR_SPACING, FONT_SCALE);
 
     const int firstLineY = y + TEXT_PADDING + ROW_HEIGHT + 14;   // the gap SETTINGS leaves too
-    const int viewportH  = HEIGHT - (firstLineY - y);
+    const int viewportH  = panelHeight - (firstLineY - y);
     const int contentH   = (lay.lineCount - 1) * ROW_HEIGHT;
     const int cursorTop  = (lay.rowLine[static_cast<size_t>(clamp(s.cursorRow, 0, MAX_CURSOR_ROW))] - 1)
                            * ROW_HEIGHT;

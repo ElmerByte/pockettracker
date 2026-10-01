@@ -95,6 +95,21 @@ public:
         return {pad, geom_.buttons.y - height - pad, outW_ - 2 * pad, height};
     }
 
+    int tracker_row_gap() const {
+        return active_ && chromeless()
+            ? std::max(0, (status_bar_rect().y - frame_.y - frame_.h -
+                           std::max(4, frame_.w / 80)) / 16) : 0;
+    }
+
+    /** Menus share the full space above the status strip; grids add spacing between rows instead. */
+    SDL_Rect content_rect() const {
+        SDL_Rect content = frame_;
+        if (active_ && chromeless())
+            content.h = std::max(content.h, status_bar_rect().y - content.y -
+                                           std::max(4, content.w / 80));
+        return content;
+    }
+
     /** The bezel's inner SCREEN area (the "glass") — the padded region `draw_chrome` fills with the
      *  tracker background and inside which `frame_rect()` sits. Handed to `present_skinned` as the modal
      *  SCRIM bounds (B4): with INTEGER scaling the frame is a whole multiple smaller than this glass, and

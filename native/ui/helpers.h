@@ -139,7 +139,7 @@ inline void draw_modal_box(Canvas& c, int x, int y, int boxW, int boxH, const Th
 
 /** The full-canvas dim under a modal that has one. ⚠️ Add the modal to `modal_backdrop_active` too,
  *  or the shell leaves the letterbox bars bright and the scrim stops at the 4:3 edge (B4). */
-inline void draw_modal_backdrop(Canvas& c) { c.fill_rect(0, 0, DESIGN_W, DESIGN_H, MODAL_BACKDROP); }
+inline void draw_modal_backdrop(Canvas& c) { c.fill_rect(0, 0, DESIGN_W, c.height(), MODAL_BACKDROP); }
 
 // ─── Row background ──────────────────────────────────────────────────────────────────────────────
 

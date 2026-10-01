@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "ui/canvas.h"
+#include "ui/layout.h"
 
 // ── The window icon, EMBEDDED — the Linux mirror of the Windows .rc (see below) ────────────────────
 // Only the platforms that have a window manager but do NOT take the icon from the executable need
@@ -194,7 +195,7 @@ bool SdlVideo::create_texture() {
     // target here is little-endian: x86-64 and aarch64), so the upload is a straight memcpy per row
     // with no swizzle.
     texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                                 DESIGN_W, DESIGN_H);
+                                 DESIGN_W, textureHeight_);
     if (!texture_) {
         std::fprintf(stderr, "SDL_CreateTexture failed: %s\n", SDL_GetError());
         return false;
@@ -340,19 +341,19 @@ bool SdlVideo::present(const Canvas& canvas, uint32_t letterboxArgb,
 bool SdlVideo::present_skinned(const Canvas& canvas, uint32_t clearArgb, const SDL_Rect& frameDest,
                                const std::function<void(SDL_Renderer*)>& underlay,
                                const std::function<void(SDL_Renderer*)>& overlay, uint64_t overlaySig,
-                               uint32_t modalScrimArgb, const SDL_Rect& scrimBounds) {
+                               uint32_t modalScrimArgb, const SDL_Rect& scrimBounds, int trackerRowGap) {
     // No re-describe here: the PORTRAIT2 mode's geometry is logged by app.cpp (see the note in
     // `present` above). Otherwise identical to the centred path — same upload, same gate, same pacing.
     // The modal scrim (when any) is bounded to `scrimBounds` — the bezel's inner glass, NOT the whole
     // output — so it dims the gap around the frame without touching the casing or the button cluster (B4).
     return present_impl(canvas, clearArgb, frameDest, underlay, overlay, overlaySig, modalScrimArgb,
-                        scrimBounds);
+                        scrimBounds, trackerRowGap);
 }
 
 bool SdlVideo::present_impl(const Canvas& canvas, uint32_t clearArgb, const SDL_Rect& dest,
                             const std::function<void(SDL_Renderer*)>& underlay,
                             const std::function<void(SDL_Renderer*)>& overlay, uint64_t overlaySig,
-                            uint32_t modalScrimArgb, const SDL_Rect& scrimBounds) {
+                            uint32_t modalScrimArgb, const SDL_Rect& scrimBounds, int trackerRowGap) {
     // ── C7: DON'T PRESENT A FRAME THAT IS ALREADY ON SCREEN ──────────────────────────────────────
     //
     // The pixel-level half of the idle-redraw discipline. `app.cpp` decides when not to DRAW; this
@@ -371,7 +372,12 @@ bool SdlVideo::present_impl(const Canvas& canvas, uint32_t clearArgb, const SDL_
     // the C7 blind-channel shape exactly (a change the comparison cannot see), one panel over from the
     // sleep-resume case; folding the overlay's fingerprint into the gate closes it. Zero when there is
     // no overlay, so this is a no-op wherever there are no on-screen controls.
-    const size_t n = static_cast<size_t>(DESIGN_W) * DESIGN_H;
+    if (textureHeight_ != canvas.height()) {
+        textureHeight_ = canvas.height();
+        haveLast_ = false;
+        if (!create_texture()) return false;
+    }
+    const size_t n = static_cast<size_t>(DESIGN_W) * canvas.height();
     if (haveLast_ && clearArgb == lastLetterbox_ && overlaySig == lastOverlaySig_ &&
         modalScrimArgb == lastModalScrim_ &&
         dest.x == lastDest_.x && dest.y == lastDest_.y && dest.w == lastDest_.w &&
@@ -390,11 +396,11 @@ bool SdlVideo::present_impl(const Canvas& canvas, uint32_t clearArgb, const SDL_
     const auto* src = reinterpret_cast<const uint8_t*>(canvas.pixels());
     const int   row = canvas.pitch_bytes();
     if (pitch == row) {
-        SDL_memcpy(dst, src, static_cast<size_t>(row) * DESIGN_H);
+        SDL_memcpy(dst, src, static_cast<size_t>(row) * canvas.height());
     } else {
         // A driver may hand back a padded pitch; copy row by row when it does.
         auto* out = reinterpret_cast<uint8_t*>(dst);
-        for (int y = 0; y < DESIGN_H; ++y) {
+        for (int y = 0; y < canvas.height(); ++y) {
             SDL_memcpy(out + static_cast<size_t>(y) * pitch, src + static_cast<size_t>(y) * row,
                        static_cast<size_t>(row));
         }
@@ -461,6 +467,35 @@ bool SdlVideo::present_impl(const Canvas& canvas, uint32_t clearArgb, const SDL_
     }
 
     SDL_RenderCopy(renderer_, texture_, nullptr, &dest);
+
+    // Reposition the sixteen tracker rows into the phone's spare vertical space.
+    // Each row keeps its original scale, so glyphs and cursor boxes are not stretched.
+    if (trackerRowGap > 0) {
+        constexpr int firstRow = pt::ui::EDITOR_Y + pt::ui::ROW_HEIGHT * 2 + 14;
+        const int rowX = dest.x;
+        const int rowW = pt::ui::EDITOR_CLIP_RIGHT * dest.w / DESIGN_W;
+        const int firstY = dest.y + firstRow * dest.h / DESIGN_H;
+        const SDL_Rect area{rowX, firstY, rowW,
+                           (DESIGN_H - firstRow) * dest.h / DESIGN_H + trackerRowGap * 16};
+        SDL_SetRenderDrawColor(renderer_, (clearArgb >> 16) & 0xFF,
+                               (clearArgb >> 8) & 0xFF, clearArgb & 0xFF, 255);
+        SDL_RenderFillRect(renderer_, &area);
+        for (int row = 0; row < 16; ++row) {
+            const int sourceY = firstRow + row * pt::ui::ROW_HEIGHT;
+            SDL_Rect source{0, sourceY, pt::ui::EDITOR_CLIP_RIGHT, pt::ui::ROW_HEIGHT};
+            const int rowY = dest.y + sourceY * dest.h / DESIGN_H + row * trackerRowGap;
+            const int rowH = (sourceY + pt::ui::ROW_HEIGHT) * dest.h / DESIGN_H -
+                             sourceY * dest.h / DESIGN_H;
+            SDL_Rect target{rowX, rowY, rowW, rowH};
+            SDL_RenderCopy(renderer_, texture_, &source, &target);
+            // Continue the row background through the new spacing.
+            source.y += source.h - 1;
+            source.h = 1;
+            target.y += target.h;
+            target.h = trackerRowGap;
+            SDL_RenderCopy(renderer_, texture_, &source, &target);
+        }
+    }
 
     // ⚠️ The overlay goes HERE — after the frame, before the flip — drawn OVER it: the landscape touch
     // panels in the bars beside the frame, or PORTRAIT2's buttons and transparent-skin header. The

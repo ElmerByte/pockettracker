@@ -18,12 +18,12 @@ int total_rows() { return THEME_FIRST_COLOR_ROW + static_cast<int>(theme_color_r
 
 }  // namespace
 
-int ThemeEditorModule::visible_row_count() {
-    return std::max(1, (HEIGHT - ROW_AREA_TOP) / ROW_HEIGHT);   // (392 − 38) / 21 = 16
+int ThemeEditorModule::visible_row_count(int height) {
+    return std::max(1, (height - ROW_AREA_TOP) / ROW_HEIGHT);   // (392 − 38) / 21 = 16
 }
 
-int ThemeEditorModule::scroll_offset(int cursor_row) {
-    const int visible   = visible_row_count();
+int ThemeEditorModule::scroll_offset(int cursor_row, int height) {
+    const int visible   = visible_row_count(height);
     const int max_scroll = std::max(0, total_rows() - visible);   // 18 − 16 = 2
     const int wanted    = (cursor_row >= visible) ? cursor_row - visible + 1 : 0;
     return std::min(std::max(wanted, 0), max_scroll);
@@ -33,7 +33,8 @@ void ThemeEditorModule::draw(Canvas& c, int x, int y, const ThemeState& s) const
     const Theme&            t  = s.theme;
     const ThemeEditorState& es = s.editor;
 
-    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    const int panelHeight = c.height() - y - 6;
+    c.fill_rect(x, y, WIDTH, panelHeight, t.background);
 
     c.draw_text("THEME EDIT", x + NAME_COL_X, y + TEXT_PADDING, t.textTitle, CHAR_SPACING, FONT_SCALE);
 
@@ -61,8 +62,8 @@ void ThemeEditorModule::draw(Canvas& c, int x, int y, const ThemeState& s) const
 
     // The colour list is taller than the panel, so the rows below the title scroll to keep the cursor
     // in view — the same idea as the song screen and the file browser.
-    const int visible = visible_row_count();
-    const int scroll  = scroll_offset(es.cursorRow);
+    const int visible = visible_row_count(panelHeight);
+    const int scroll  = scroll_offset(es.cursorRow, panelHeight);
 
     const auto row_visible = [&](int logical) {
         return logical >= scroll && logical < scroll + visible;

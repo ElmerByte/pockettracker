@@ -67,7 +67,7 @@ songcore::MapTarget InstrumentFxEditorModule::map_target(int row) const {
 
 void InstrumentFxEditorModule::draw(Canvas& c, const songcore::Instrument& ins, int row,
                                     const Theme& t) const {
-    c.fill_rect(0, 0, DESIGN_W, DESIGN_H, t.background);
+    c.fill_rect(0, 0, DESIGN_W, c.height(), t.background);
     c.draw_text("INSTRUMENT FX", 10, 8, t.textTitle, CHAR_SPACING, FONT_SCALE);
     c.draw_text("INST " + hex2(ins.id) + "  " + songcore::instrument_type_name(ins.instrumentType),
                 10, 34, t.textParam, CHAR_SPACING, FONT_SCALE);
@@ -81,7 +81,8 @@ void InstrumentFxEditorModule::draw(Canvas& c, const songcore::Instrument& ins, 
                     CHAR_SPACING, FONT_SCALE);
         draw_cursor_cell(c, value, 350, y, i == row, t.textValue, t);
     }
-    c.draw_text("A+DPAD EDIT  START LISTEN  B BACK", 35, 440, t.textEmpty, CHAR_SPACING, FONT_SCALE);
+    c.draw_text("A+DPAD EDIT  START LISTEN  B BACK", 35, c.height() - 40,
+                t.textEmpty, CHAR_SPACING, FONT_SCALE);
 }
 
 }  // namespace pt::ui

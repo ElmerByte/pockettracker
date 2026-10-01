@@ -53,7 +53,7 @@ void TrackerLayout::draw(Canvas& c, const AppState& s) {
 void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
     const Theme& t = s.theme;
 
-    c.fill_rect(0, 0, DESIGN_W, DESIGN_H, t.background);
+    c.fill_rect(0, 0, DESIGN_W, c.height(), t.background);
 
     if (!s.project) return;  // no document: the background is the honest thing to draw
 
@@ -151,7 +151,7 @@ void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
     // Clipped to the left of the right bar. FILE_BROWSER and SAMPLE_EDITOR are full-screen and draw
     // OUTSIDE this clip when they land (S6/S7); everything else lives inside it.
     {
-        Canvas::ClipScope clip(c, 0, 0, EDITOR_CLIP_RIGHT, DESIGN_H);
+        Canvas::ClipScope clip(c, 0, 0, EDITOR_CLIP_RIGHT, c.height());
 
         // ── The EQ EDITOR takes the editor's place, and leaves the furniture alone ───────────────
         //
@@ -542,7 +542,7 @@ void TrackerLayout::draw_right_bar(Canvas& c, const AppState& s) const {
     const int x = RIGHT_BAR_X + 8;
     const int width = NavigationMapModule::WIDTH - 16;
     c.fill_rect(RIGHT_BAR_X, EDITOR_Y, NavigationMapModule::WIDTH,
-                DESIGN_H - EDITOR_Y - SCREEN_SPACER, t.vizBackground);
+                c.height() - EDITOR_Y - SCREEN_SPACER, t.vizBackground);
     c.draw_text("TEMPO", x, EDITOR_Y + TEXT_PADDING, t.textParam, CHAR_SPACING, FONT_SCALE);
     c.draw_text(std::to_string(p.tempo), x, EDITOR_Y + ROW_HEIGHT + TEXT_PADDING,
                 t.textValue, CHAR_SPACING, FONT_SCALE);
@@ -557,7 +557,7 @@ void TrackerLayout::draw_right_bar(Canvas& c, const AppState& s) const {
                     note == songcore::Note::EMPTY() ? t.textEmpty : t.textValue,
                     CHAR_SPACING, FONT_SCALE);
     }
-    const int navY = DESIGN_H - NavigationMapModule::HEIGHT - SCREEN_SPACER;
+    const int navY = c.height() - NavigationMapModule::HEIGHT - SCREEN_SPACER;
     c.draw_text("NAV", x, navY - ROW_HEIGHT - 8, t.textParam, CHAR_SPACING, FONT_SCALE);
     c.fill_rect(x, navY - 7, width, 1, t.textEmpty);
 
@@ -567,7 +567,7 @@ void TrackerLayout::draw_right_bar(Canvas& c, const AppState& s) const {
     ns.instrumentFromPool = s.instrumentFromPool;
     ns.theme              = t;
     ns.theme.background   = t.vizBackground;
-    navigationMap_.draw(c, RIGHT_BAR_X, DESIGN_H - NavigationMapModule::HEIGHT - SCREEN_SPACER, ns);
+    navigationMap_.draw(c, RIGHT_BAR_X, c.height() - NavigationMapModule::HEIGHT - SCREEN_SPACER, ns);
 }
 
 void TrackerLayout::draw_placeholder(Canvas& c, int x, int y, ScreenType screen,

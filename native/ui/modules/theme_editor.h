@@ -210,10 +210,10 @@ public:
     //    reverse, is exactly the class of bug S2 found in the nav map).
 
     /** How many rows fit in the panel below the title. */
-    static int visible_row_count();
+    static int visible_row_count(int height = HEIGHT);
 
     /** The first logical row drawn, given where the cursor is. 0 until the cursor pushes past the end. */
-    static int scroll_offset(int cursor_row);
+    static int scroll_offset(int cursor_row, int height = HEIGHT);
 
 private:
     static constexpr int NAME_COL_X = 10;

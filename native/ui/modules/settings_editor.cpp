@@ -31,7 +31,8 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
     const Theme&          t = s.theme;
     const SettingsValues& v = s.values;
 
-    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    const int panelHeight = c.height() - y - 6;
+    c.fill_rect(x, y, WIDTH, panelHeight, t.background);
 
     const int labelX = x + NAME_X;
     const int val1X  = x + VAL1_X;
@@ -49,7 +50,7 @@ void SettingsModule::draw(Canvas& c, int x, int y, const SettingsState& s) const
     // release build, where the debug rows are hidden) `maxScroll` is 0 and this is a no-op. The scroll is
     // DERIVED from the cursor row each frame — no stored scroll state — centring the cursor in the
     // viewport, pinned at the top and bottom by the clamp.
-    const int viewportH = HEIGHT - (firstRowY - y);
+    const int viewportH = panelHeight - (firstRowY - y);
     const int contentH  = settings_content_height(s.caps, ROW_HEIGHT);
     const int maxScroll = std::max(0, contentH - viewportH);
     const int cursorTop =

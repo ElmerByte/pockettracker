@@ -66,7 +66,8 @@ void MidiMapModule::draw(Canvas& c, int x, int y, const MidiMapState& s) const {
     const Theme&            t = s.theme;
     const songcore::Project& p = s.project;
 
-    c.fill_rect(x, y, WIDTH, HEIGHT, t.background);
+    const int panelHeight = c.height() - y - 6;
+    c.fill_rect(x, y, WIDTH, panelHeight, t.background);
 
     const auto colX = [&](int column) { return x + NAME_X + column * CHAR_W; };
 
@@ -96,7 +97,7 @@ void MidiMapModule::draw(Canvas& c, int x, int y, const MidiMapState& s) const {
     // clamps `maxScroll` to 0 and nothing moves — which is every list until someone makes fifteen
     // mappings.
     const int firstRowY = headerY + ROW_HEIGHT;
-    const int footerY   = y + HEIGHT - ROW_HEIGHT;
+    const int footerY   = y + panelHeight - ROW_HEIGHT;
     const int viewportH = footerY - firstRowY;
     const int rows      = midi_map_row_count(p);
     const int maxScroll = std::max(0, rows * ROW_HEIGHT - viewportH);

@@ -63,6 +63,14 @@ inline uint32_t next_codepoint(const std::string& s, size_t& i) {
 
 }  // namespace
 
+void Canvas::set_height(int height) {
+    height = std::max(DESIGN_H, height);
+    if (height == height_) return;
+    height_ = height;
+    px_.resize(static_cast<size_t>(DESIGN_W) * height_);
+    reset_clip();
+}
+
 void Canvas::clear(Argb color) {
     std::fill(px_.begin(), px_.end(), color);
 }
@@ -71,14 +79,14 @@ void Canvas::set_clip(int x, int y, int w, int h) {
     clipX_ = std::max(0, x);
     clipY_ = std::max(0, y);
     clipW_ = std::max(0, std::min(x + w, DESIGN_W) - clipX_);
-    clipH_ = std::max(0, std::min(y + h, DESIGN_H) - clipY_);
+    clipH_ = std::max(0, std::min(y + h, height_) - clipY_);
 }
 
 void Canvas::reset_clip() {
     clipX_ = 0;
     clipY_ = 0;
     clipW_ = DESIGN_W;
-    clipH_ = DESIGN_H;
+    clipH_ = height_;
 }
 
 void Canvas::blend_px(int x, int y, Argb color) {

@@ -791,6 +791,24 @@ int run(const AppConfig& cfg) {
     // away for the whole length of a resample/export and snapping it back when the loop resumed. Both
     // callers now go through here, so that divergence cannot reopen. Assumes layout.draw() already
     // refreshed `canvas`.
+    const auto spaced_grid = [&]() {
+        return (state.currentScreen == ui::ScreenType::SONG ||
+                state.currentScreen == ui::ScreenType::CHAIN ||
+                state.currentScreen == ui::ScreenType::PHRASE ||
+                state.currentScreen == ui::ScreenType::TABLE ||
+                state.currentScreen == ui::ScreenType::INST_POOL) &&
+               !ui::modal_backdrop_active(state) && !state.eq.isOpen && !state.themeEditor.isOpen;
+    };
+    const auto draw_current = [&]() {
+        int height = ui::DESIGN_H;
+        if (portrait.active() && !spaced_grid()) {
+            const SDL_Rect available = portrait.content_rect();
+            if (available.w > 0)
+                height = std::max(height, available.h * ui::DESIGN_W / available.w);
+        }
+        canvas.set_height(height);
+        layout.draw(canvas, state);
+    };
     const auto present_current = [&]() -> bool {
         // The CRT overlay: a translucent PNG over the tracker's on-screen box at STR/255 alpha, on the
         // FRAME rect (portrait.frame_rect() in the bezel, video.frame_rect() centred in landscape),
@@ -820,9 +838,17 @@ int run(const AppConfig& cfg) {
             float statusPeaks[2] = {};
             if (state.isPlaying) engineRef.getMasterPeaks(statusPeaks);
             const bool dirty = state.project_dirty();
+            const int trackerRowGap = spaced_grid() ? portrait.tracker_row_gap() : 0;
+            SDL_Rect content = portrait.frame_rect();
+            content.h = canvas.height() * content.w / ui::DESIGN_W;
             const auto buttons = [&portrait, &skin, &helvFont, &arrowFont, &hermitFont, &input,
-                                  &screenOverlay, &statusPeaks, ovOn, ovStr, &state, dirty](SDL_Renderer* r) {
-                if (ovOn) screenOverlay.draw(r, portrait.frame_rect(), ovStr);
+                                  &screenOverlay, &statusPeaks, ovOn, ovStr, &state, dirty,
+                                  trackerRowGap, content](SDL_Renderer* r) {
+                if (ovOn) {
+                    SDL_Rect glass = content;
+                    glass.h += trackerRowGap * 16;
+                    screenOverlay.draw(r, glass, ovStr);
+                }
                 portrait.draw_buttons(r, skin, helvFont, arrowFont, hermitFont, input,
                                       state.isPlaying, dirty, statusPeaks);
             };
@@ -835,11 +861,12 @@ int run(const AppConfig& cfg) {
             const uint32_t scrim = ui::modal_backdrop_active(state) ? ui::MODAL_BACKDROP : 0;
             const uint64_t meterSig = static_cast<uint64_t>(std::clamp(statusPeaks[0], 0.0f, 1.0f) * 7) |
                                       (static_cast<uint64_t>(std::clamp(statusPeaks[1], 0.0f, 1.0f) * 7) << 3);
-            return video.present_skinned(canvas, portrait.casing_argb(), portrait.frame_rect(),
+            return video.present_skinned(canvas, portrait.casing_argb(), content,
                                          chrome, buttons,
                                          portrait.signature(input) ^ crtSig ^ (meterSig << 10) ^
+                                         (static_cast<uint64_t>(trackerRowGap) << 52) ^
                                          (static_cast<uint64_t>(dirty) << 61), scrim,
-                                         portrait.screen_rect());
+                                         portrait.screen_rect(), trackerRowGap);
         }
         // Landscape / desktop: the centred frame, the LEFT/RIGHT touch panels in the bars beside it —
         // inert (drawing nothing, signature 0) when there is no touchscreen.
@@ -864,7 +891,7 @@ int run(const AppConfig& cfg) {
     // through present_current, the SAME branch the loop uses, so it keeps the PORTRAIT2 skin instead of
     // flashing the bare frame fullscreen for the render's duration. See present_current above.
     hooks.repaint       = [&]() {
-        layout.draw(canvas, state);
+        draw_current();
         present_current();
     };
 
@@ -1848,7 +1875,7 @@ int run(const AppConfig& cfg) {
         }
         if (audible || audibleEdge || sawInput || !drewOnce || settling || metersFalling ||
             timedWork || timedWorkEdge) {
-            layout.draw(canvas, state);
+            draw_current();
             ++drawn;
 
             // ── The frame, and around it whatever this orientation's skin is ──────────────────────

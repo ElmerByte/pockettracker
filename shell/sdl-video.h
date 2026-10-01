@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <functional>
 #include <vector>
+#include "ui/canvas.h"
 
 namespace pt::ui {
 class Canvas;
@@ -113,7 +114,8 @@ public:
     bool present_skinned(const pt::ui::Canvas& canvas, uint32_t clearArgb, const SDL_Rect& frameDest,
                          const std::function<void(SDL_Renderer*)>& underlay,
                          const std::function<void(SDL_Renderer*)>& overlay, uint64_t overlaySig,
-                         uint32_t modalScrimArgb = 0, const SDL_Rect& scrimBounds = {0, 0, 0, 0});
+                         uint32_t modalScrimArgb = 0, const SDL_Rect& scrimBounds = {0, 0, 0, 0},
+                         int trackerRowGap = 0);
 
     /**
      * Force the NEXT present, whatever the pixels say — the frame on screen is no longer the one we
@@ -203,7 +205,7 @@ private:
     bool present_impl(const pt::ui::Canvas& canvas, uint32_t clearArgb, const SDL_Rect& dest,
                       const std::function<void(SDL_Renderer*)>& underlay,
                       const std::function<void(SDL_Renderer*)>& overlay, uint64_t overlaySig,
-                      uint32_t modalScrimArgb, const SDL_Rect& scrimBounds);
+                      uint32_t modalScrimArgb, const SDL_Rect& scrimBounds, int trackerRowGap = 0);
 
     /** One line naming the driver, the panel, the output size and the letterbox. See the .cpp. */
     void describe() const;
@@ -211,6 +213,7 @@ private:
     SDL_Window*   window_   = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     SDL_Texture*  texture_  = nullptr;
+    int textureHeight_ = pt::ui::DESIGN_H;
     ScalingMode   scaling_  = ScalingMode::INTEGER;
     bool          topAnchor_ = false;
     bool          vsync_    = false;

@@ -47,6 +47,10 @@ class Canvas {
 public:
     Canvas() : px_(static_cast<size_t>(DESIGN_W) * DESIGN_H, 0xFF000000) { reset_clip(); }
 
+    // Portrait menus can use a taller viewport without changing glyph proportions.
+    int height() const { return height_; }
+    void set_height(int height);
+
     // ── The frame ────────────────────────────────────────────────────────────────────────────────
 
     /** Fill the whole canvas, clip ignored. The Compose surface sits on `Color.Black`; so does this. */
@@ -137,6 +141,7 @@ public:
 private:
     void blend_px(int x, int y, Argb color);
 
+    int height_ = DESIGN_H;
     std::vector<uint32_t> px_;
     int                   clipX_ = 0, clipY_ = 0, clipW_ = DESIGN_W, clipH_ = DESIGN_H;
 };
