@@ -68,6 +68,7 @@ public:
 
     /** The baseline drop below the text top at `px` — a Compose `Text` places its first baseline here. */
     int ascent_px(float px) const { return rast_.ascent_px(px); }
+    int line_height_px(float px) const { return rast_.line_height_px(px); }
 
     /**
      * Draw a smooth D-pad arrow filling `box` (centred, with a small internal margin), tinted `rgb`.

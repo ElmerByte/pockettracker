@@ -88,6 +88,13 @@ public:
      *  THERE (not window-centred). Handed to `SdlVideo::present_skinned` as the frame dest. */
     SDL_Rect frame_rect() const { return frame_; }
 
+    SDL_Rect status_bar_rect() const {
+        const int headerH = outW_ * 16 / 100;
+        const int pad = std::max(4, headerH / 9);
+        const int height = std::max(30, outW_ / 12);
+        return {pad, geom_.buttons.y - height - pad, outW_ - 2 * pad, height};
+    }
+
     /** The bezel's inner SCREEN area (the "glass") — the padded region `draw_chrome` fills with the
      *  tracker background and inside which `frame_rect()` sits. Handed to `present_skinned` as the modal
      *  SCRIM bounds (B4): with INTEGER scaling the frame is a whole multiple smaller than this glass, and

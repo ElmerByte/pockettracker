@@ -91,8 +91,8 @@ const char* hermit_label(Button b) {
         case Button::R_SHIFT:    return u8"R \U000F0636";
         case Button::A:          return "A";
         case Button::B:          return "B";
-        case Button::SELECT:     return "sel.";
-        case Button::START:      return "start.";
+        case Button::SELECT:     return "SEL";
+        case Button::START:      return "START";
         case Button::DPAD_UP:    return u8"\U000F005D";
         case Button::DPAD_DOWN:  return u8"\U000F0045";
         case Button::DPAD_LEFT:  return u8"\U000F004D";
@@ -155,7 +155,10 @@ void PortraitSkin::layout(int outW, int outH, bool enabled, bool fit) {
                                  static_cast<float>(ib.h) / pt::ui::DESIGN_H);
         const int   w = static_cast<int>(pt::ui::DESIGN_W * s);
         const int   h = static_cast<int>(pt::ui::DESIGN_H * s);
-        frame_ = SDL_Rect{ib.x + (ib.w - w) / 2, ib.y + (ib.h - h) / 2, w, h};
+        const int centeredY = ib.y + (ib.h - h) / 2;
+        const int headerBottom = outW_ * 16 / 100 + std::max(4, outW_ / 80);
+        frame_ = SDL_Rect{ib.x + (ib.w - w) / 2,
+                          chromeless() ? std::min(centeredY, headerBottom) : centeredY, w, h};
     } else {
         frame_ = to_sdl(geom_.frame);
     }
@@ -201,20 +204,23 @@ void PortraitSkin::draw_buttons(SDL_Renderer* r, const Skin& skin, Font& font, F
     if (!active_) return;
 
     if (chromeless()) {
-        // Overlay the unused top margin of the tracker frame, as in the reference screenshot.
-        const int headerH = outW_ * 22 / 100;
+        // Keep the branding at the bottom of the header, below the phone's camera area.
+        const int headerH = outW_ * 16 / 100;
         const int pad = std::max(4, headerH / 9);
-        const int logoH = headerH * 31 / 100;
+        const int logoH = outW_ * 6 / 100;
         const SkinTexture& logo = skin.piece(SkinPiece::Logo);
         if (logo && logo.height > 0) {
             const int logoW = logoH * logo.width / logo.height;
             skin.draw_tinted(r, SkinPiece::Logo,
-                             SDL_Rect{outW_ - pad - logoW, headerH * 52 / 100,
+                             SDL_Rect{outW_ - pad - logoW, headerH - pad - logoH,
                                       logoW, logoH}, ink_rgb());
         }
-        if (hermitFont.loaded())
-            hermitFont.draw_text("florktracker.", pad, headerH * 55 / 100,
-                                 headerH * 0.26f, ink_rgb());
+        if (hermitFont.loaded()) {
+            const float titlePx = outW_ * 0.0456f;
+            hermitFont.draw_text("florktracker.", pad,
+                                 headerH - pad - hermitFont.line_height_px(titlePx),
+                                 titlePx, ink_rgb());
+        }
 
         // A quiet separator uses the same two live theme colours as the header and keys.
         const uint32_t bg = themeBg_, ink = ink_rgb();
@@ -224,43 +230,33 @@ void PortraitSkin::draw_buttons(SDL_Renderer* r, const Skin& skin, Font& font, F
         SDL_SetRenderDrawColor(r, faded(16), faded(8), faded(0), 255);
         SDL_RenderDrawLine(r, pad / 2, headerH - 1, outW_ - pad / 2, headerH - 1);
 
-        // Keep the status below the tracker image, in the gap above the keys.
+        // One aligned strip between the tracker and controls, using the live theme ink.
         const int gap = geom_.buttons.y - (frame_.y + frame_.h);
-        if (hermitFont.loaded() && gap >= 34) {
-            const int y = frame_.y + frame_.h + gap / 2 - 12;
+        const SDL_Rect bar = status_bar_rect();
+        const int barH = bar.h;
+        if (hermitFont.loaded() && gap >= barH + pad) {
+            const int barY = bar.y;
+            const auto strip = [bg, ink](int shift) {
+                return static_cast<Uint8>((3 * ((bg >> shift) & 0xFF) + ((ink >> shift) & 0xFF)) / 4);
+            };
+            SDL_SetRenderDrawColor(r, strip(16), strip(8), strip(0), 255);
+            SDL_RenderFillRect(r, &bar);
             const float px = std::max(13.0f, outW_ * 0.027f);
-            const float iconPx = px * 1.2f;
-            const char* transportIcon = playing ? u8"\U000F040A" : u8"\U000F04DB";
-            hermitFont.draw_text(transportIcon, pad, y - 5, iconPx, ink);
-            hermitFont.draw_text(playing ? "play." : "stop.",
-                                 pad + hermitFont.text_width(transportIcon, iconPx) + 5, y, px, ink);
-            if (dirty) {
-                const char* saveIcon = u8"\U000F0193";
-                const int width = hermitFont.text_width(saveIcon, iconPx) + 5 +
-                                  hermitFont.text_width("unsaved.", px);
-                const int x = (outW_ - width) / 2;
-                hermitFont.draw_text(saveIcon, x, y - 5, iconPx, ink);
-                hermitFont.draw_text("unsaved.", x + hermitFont.text_width(saveIcon, iconPx) + 5,
-                                     y, px, ink);
-            }
-
+            const int y = barY + (barH - hermitFont.line_height_px(px)) / 2;
+            hermitFont.draw_text(playing ? "PLAY" : "STOP", pad * 2, y, px, ink);
+            const std::string save = dirty ? "UNSAVED" : "SAVED";
+            hermitFont.draw_text(save, (outW_ - hermitFont.text_width(save, px)) / 2, y, px, ink);
             const int meterW = std::max(44, outW_ / 8);
-            const int meterX = outW_ - pad - meterW;
-            const int meterY = y + 3;
-            const char* waveIcon = u8"\U000F147D";
-            hermitFont.draw_text(waveIcon, meterX - hermitFont.text_width(waveIcon, iconPx) - 6,
-                                 y - 10, iconPx, ink);
-            SDL_SetRenderDrawColor(r, faded(16), faded(8), faded(0), 255);
+            const int meterX = outW_ - pad * 2 - meterW;
+            const int meterY = barY + barH / 2 - 6;
             for (int channel = 0; channel < 2; ++channel) {
-                const SDL_Rect track{meterX, meterY + channel * 9, meterW, 4};
-                SDL_RenderFillRect(r, &track);
-                const int level = playing ? static_cast<int>(std::clamp(peaks[channel], 0.0f, 1.0f) * 7) : 0;
-                const SDL_Rect fill{meterX, track.y, meterW * level / 7, track.h};
-                SDL_SetRenderDrawColor(r, static_cast<Uint8>((ink >> 16) & 0xFF),
-                                       static_cast<Uint8>((ink >> 8) & 0xFF),
-                                       static_cast<Uint8>(ink & 0xFF), 255);
-                SDL_RenderFillRect(r, &fill);
                 SDL_SetRenderDrawColor(r, faded(16), faded(8), faded(0), 255);
+                const SDL_Rect track{meterX, meterY + channel * 8, meterW, 4};
+                SDL_RenderFillRect(r, &track);
+                const int level = static_cast<int>(std::clamp(peaks[channel], 0.0f, 1.0f) * 7);
+                const SDL_Rect fill{meterX, track.y, meterW * level / 7, track.h};
+                SDL_SetRenderDrawColor(r, (ink >> 16) & 0xFF, (ink >> 8) & 0xFF, ink & 0xFF, 255);
+                SDL_RenderFillRect(r, &fill);
             }
         }
     }
@@ -291,18 +287,32 @@ void PortraitSkin::draw_buttons(SDL_Renderer* r, const Skin& skin, Font& font, F
         // FillBounds: RenderCopy stretches the button PNG to the cell — Compose's ContentScale.FillBounds.
         // A missing piece is a Skin::draw no-op, so an incomplete theme shows the backing through.
         const SkinPiece piece = piece_for(skin, br.button, pressed);
-        if (tinted) skin.draw_tinted(r, piece, dst, ink);
+        if (tinted) {
+            const int inset = std::max(4, outW_ / 90);
+            SDL_Rect outline{dst.x + inset, dst.y + inset, dst.w - inset * 2, dst.h - inset * 2};
+            SDL_SetRenderDrawColor(r, (ink >> 16) & 0xFF, (ink >> 8) & 0xFF, ink & 0xFF,
+                                   pressed ? 255 : 180);
+            if (pressed) {
+                SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(r, (ink >> 16) & 0xFF, (ink >> 8) & 0xFF, ink & 0xFF, 40);
+                SDL_RenderFillRect(r, &outline);
+                SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+                SDL_SetRenderDrawColor(r, (ink >> 16) & 0xFF, (ink >> 8) & 0xFF, ink & 0xFF, 255);
+            }
+            for (int stroke = 0; stroke < std::max(1, outW_ / 500); ++stroke) {
+                SDL_RenderDrawRect(r, &outline);
+                ++outline.x; ++outline.y; outline.w -= 2; outline.h -= 2;
+            }
+        }
         else        skin.draw(r, piece, dst);
 
         if (tinted && hermitFont.loaded()) {
             const Portrait2Label lab = label_for(br.button);
-            const bool smallCaption = br.button == Button::SELECT || br.button == Button::START;
-            const float px = smallCaption ? fm.small_sp * 0.82f
-                                          : (lab.large ? fm.large_sp : fm.small_sp);
+            const float px = lab.large ? fm.large_sp * 0.85f : fm.small_sp * 0.85f;
             const std::string text = hermit_label(br.button);
-            const int x = lab.wide ? dst.x + dst.w / 4
-                                   : dst.x + (dst.w - hermitFont.text_width(text, px)) / 2;
-            const int y = dst.y + R(fm.off_y_dp) + (pressed ? R(fm.pressed_dp) : 0);
+            const int x = dst.x + (dst.w - hermitFont.text_width(text, px)) / 2;
+            const int y = dst.y + (dst.h - hermitFont.line_height_px(px)) / 2 +
+                          (pressed ? std::max(1, outW_ / 300) : 0);
             hermitFont.draw_text(text, x, y, px, ink);
             continue;
         }
