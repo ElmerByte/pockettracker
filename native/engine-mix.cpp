@@ -949,10 +949,12 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             std::max(1, voice.actualLoopEnd - voice.actualLoopStart) : 0.0;
         const auto detuneRatio = [&](float modulation) {
             const float value = std::clamp(synthParams->synthDetune2 + modulation, 0.0f, 255.0f);
-            return std::pow(2.0f, (value - 128.0f) / 1536.0f);
+            return value == 128.0f ? 1.0f : std::pow(2.0f, (value - 128.0f) / 1536.0f);
         };
         const float detuneStart = dualOsc ? detuneRatio(voice.prevModDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
-        const float detuneEnd = dualOsc ? detuneRatio(voice.modDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
+        const float detuneEnd = dualOsc && voice.modDestValues[PARAM_SYNTH_DETUNE2] !=
+            voice.prevModDestValues[PARAM_SYNTH_DETUNE2]
+            ? detuneRatio(voice.modDestValues[PARAM_SYNTH_DETUNE2]) : detuneStart;
         const float syncRatio = dualOsc ? 1.0f + 7.0f * synthParams->synthSync / 255.0f : 1.0f;
         const float mixStart = voice.synthMix;
         const bool chordEnabled = voice.synthChordOverride < 0
@@ -964,6 +966,9 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 &synthParams->synthChordBankRatio[voice.synthChordOverride - 2];
         const float chordStart = voice.synthChordBlend;
         const bool renderChord = dualOsc && (chordTarget > 0.0f || chordStart > 0.0f);
+        // The original oscillators are audible only outside a chord or during its crossfade.
+        // Their phase/noise clocks still advance, so switching CHD off resumes the same sound.
+        const bool renderBase = !renderChord || chordStart < 1.0f || chordTarget < 1.0f;
         if (renderChord && chordStart == 0.0f) {
             const double phase = voice.position / synth::CYCLE;
             voice.synthChordPhase1.fill(phase - std::floor(phase));
@@ -1047,15 +1052,17 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 voice.chain.processStereo(procL, procR);
             } else {
                 // ── MONO FETCH ───────────────────────────────────────────────────
-                float sample1 = voice.sampleData[idx];
-                float sample2 = voice.sampleData[idx + 1];
-                if (effDownsample > 0) {
-                    int downsampleFactor = 1 << effDownsample;
-                    int quantizedIdx = (idx / downsampleFactor) * downsampleFactor;
-                    sample1 = voice.sampleData[quantizedIdx];
-                    sample2 = voice.sampleData[quantizedIdx];
+                float processedSample = 0.0f;
+                if (renderBase) {
+                    float sample1 = voice.sampleData[idx];
+                    float sample2 = voice.sampleData[idx + 1];
+                    if (effDownsample > 0) {
+                        int downsampleFactor = 1 << effDownsample;
+                        int quantizedIdx = (idx / downsampleFactor) * downsampleFactor;
+                        sample1 = sample2 = voice.sampleData[quantizedIdx];
+                    }
+                    processedSample = sample1 + (sample2 - sample1) * frac;
                 }
-                float processedSample = sample1 + (sample2 - sample1) * frac;
                 float chordL = 0.0f, chordR = 0.0f;
                 if (dualOsc) {
                     const auto modulation = [&](ParamId parameter) {
@@ -1064,29 +1071,37 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     };
                     const float width1 = synthParams->synthPulseWidth1 + modulation(PARAM_SYNTH_PW1);
                     const float width2 = synthParams->synthPulseWidth2 + modulation(PARAM_SYNTH_PW2);
-                    if (synthParams->synthWave == synth::NOISE)
-                        processedSample = voice.synthNoise1.sample(effDownsample);
-                    else if (synthParams->synthWave == 3 && width1 != 128.0f)
-                        processedSample = synth::pulse(voice.position / synth::CYCLE * syncRatio,
-                                                       width1, effDownsample);
                     const float blend = std::clamp(mixStart + (mixTarget - mixStart) *
                         static_cast<float>(i - startFrame + 1) / std::max(1, to - startFrame) +
                         modulation(PARAM_SYNTH_MIX) / 255.0f, 0.0f, 1.0f);
-                    if (blend > 0.0f) {
-                        const float second = synthParams->synthWave2 == synth::NOISE
-                            ? voice.synthNoise2.sample(effDownsample)
-                            : synthParams->synthWave2 == 3
-                            ? synth::pulse(voice.synthPhase2, width2, effDownsample)
-                            : synth::sample(synthParams->synthWave2, voice.synthPhase2, effDownsample);
-                        processedSample = processedSample * (1.0f - blend) + second * blend;
+                    if (renderBase) {
+                        if (synthParams->synthWave == synth::NOISE)
+                            processedSample = voice.synthNoise1.sample(effDownsample);
+                        else if (synthParams->synthWave == 3 && width1 != 128.0f)
+                            processedSample = synth::pulse(voice.position / synth::CYCLE * syncRatio,
+                                                           width1, effDownsample);
+                        if (blend > 0.0f) {
+                            const float second = synthParams->synthWave2 == synth::NOISE
+                                ? voice.synthNoise2.sample(effDownsample)
+                                : synthParams->synthWave2 == 3
+                                ? synth::pulse(voice.synthPhase2, width2, effDownsample)
+                                : synth::sample(synthParams->synthWave2, voice.synthPhase2, effDownsample);
+                            processedSample = processedSample * (1.0f - blend) + second * blend;
+                        }
+                    } else {
+                        // Preserve the random sequence without fetching or mixing inaudible waves.
+                        if (synthParams->synthWave == synth::NOISE)
+                            voice.synthNoise1.sample(effDownsample);
+                        if (blend > 0.0f && synthParams->synthWave2 == synth::NOISE)
+                            voice.synthNoise2.sample(effDownsample);
                     }
-                    synth::advance(voice.synthPhase2, phaseStep * (detuneStart + (detuneEnd - detuneStart) * t));
+                    const float detune = detuneStart + (detuneEnd - detuneStart) * t;
+                    synth::advance(voice.synthPhase2, phaseStep * detune);
                     if (renderChord) {
                         const auto oscillator = [&](int wave, double phase, float width, synth::Noise& noise) {
                             if (wave == synth::NOISE) return noise.sample(effDownsample);
-                            phase -= std::floor(phase);
-                            return wave == 3 ? synth::pulse(phase, width, effDownsample)
-                                             : synth::sample(wave, phase, effDownsample);
+                            if (wave == 3) return synth::pulse(phase, width, effDownsample);
+                            return synth::sample(wave, phase - std::floor(phase), effDownsample);
                         };
                         for (int n = 0; n < 3; ++n) {
                             const float first = oscillator(synthParams->synthWave,
@@ -1098,15 +1113,15 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                             chordR += value * synthParams->synthChordRight[n];
                             const double step = phaseStep * (*chordRatio)[n];
                             synth::advance(voice.synthChordPhase1[n], step);
-                            synth::advance(voice.synthChordPhase2[n], step * (detuneStart + (detuneEnd - detuneStart) * t));
+                            synth::advance(voice.synthChordPhase2[n], step * detune);
                         }
                     }
                 }
                 voice.chain.filter.setInterpolatedCoeffs(t);
                 if (renderChord) {
                     const float amount = chordStart + (chordTarget - chordStart) * t;
-                    procL = processedSample + (chordL - processedSample) * amount;
-                    procR = processedSample + (chordR - processedSample) * amount;
+                    procL = renderBase ? processedSample + (chordL - processedSample) * amount : chordL;
+                    procR = renderBase ? processedSample + (chordR - processedSample) * amount : chordR;
                     voice.chain.processStereo(procL, procR);
                 } else {
                     procL = procR = voice.chain.processMono(processedSample);

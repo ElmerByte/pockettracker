@@ -14,7 +14,7 @@
 #include "ui/modules/chord_banks.h"
 #include "ui/instrument_row_layout.h"
 
-static std::vector<float> render(songcore::Instrument ins, float pitch = 220, int chordFx = -1, bool table = false, bool restart = false) {
+static std::vector<float> render(songcore::Instrument ins, float pitch = 220, int chordFx = -1, bool table = false, bool restart = false, int offAt = -1) {
     auto engine = std::make_unique<AudioEngine>();
     engine->setDeviceSampleRate(48000);
     ins.id = ins.sampleId = 0;
@@ -36,6 +36,7 @@ static std::vector<float> render(songcore::Instrument ins, float pitch = 220, in
         engine->scheduleVoiceCc(24000, 0, songcore::CC_SYNTH_CHORD, 1 / 255.0f);
         engine->scheduleNote(48000, 0, 0, pitch, 48000.0f / 1024, 0.5f);
     }
+    if (offAt >= 0) engine->scheduleVoiceCc(offAt, 0, songcore::CC_SYNTH_CHORD, 1.0f);
     engine->scheduleNoteOff(restart ? 72000 : 48000, 0);
     std::vector<float> audio(96000 * 2);
     for (int frame = 0; frame < 96000; frame += 128)
@@ -134,6 +135,20 @@ int main() {
     const auto offFx = render(fxIns, 220, 255);
     assert(amplitude(offFx, 220) > 0.1);
     assert(amplitude(offFx, 220 * std::pow(2.0, 4 / 12.0)) < 0.01);
+
+    // A fully audible chord must keep the hidden base noise/phase clock running.
+    // Turning it off resumes the exact noise sequence and OSC2 pitch of a plain note.
+    for (int wave : {0, 3, 4}) {
+        auto patch = fxIns;
+        patch.synthChordMode = 0;
+        patch.synthWave = patch.synthWave2 = wave;
+        patch.synthMix = 128; patch.synthDetune2 = 145;
+        const auto plain = render(patch);
+        const auto toggled = render(patch, 220, 0, false, false, 24000);
+        for (int frame = 26000; frame < 45000; ++frame)
+            for (int channel = 0; channel < 2; ++channel)
+                assert(std::abs(plain[frame*2+channel] - toggled[frame*2+channel]) < 0.000001f);
+    }
 
     struct Recorder : IMidiConsumer {
         std::vector<Event> events;
