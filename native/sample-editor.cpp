@@ -867,6 +867,14 @@ void AudioEngine::setProgram(int instrumentId, const songcore::Program& program,
     row.program.sliceCount   = n;
     row.program.sliceMarkers = nullptr;   // programView re-points it at the audio thread's own copy
     programs.publish(instrumentId);
+    if (program.sampleId >= 0 && program.sampleId < 256) {
+        auto& params = instrumentParams.edit(program.sampleId);
+        params.synthEnabled = program.type == songcore::PROGRAM_SYNTH;
+        params.synthWave2 = program.synthWave2;
+        params.synthMix = program.synthMix;
+        params.synthDetuneRatio = program.synthDetuneRatio;
+        instrumentParams.publish(program.sampleId);
+    }
 }
 
 void AudioEngine::setInstrumentSendLevels(int instrId, int reverbHex, int delayHex, int chorusHex) {

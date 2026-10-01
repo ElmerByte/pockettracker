@@ -423,6 +423,11 @@ struct InstrumentParams {
     int loopStart;      // 0-255 (normalized position)
     int loopEnd;        // 0-255 (normalized position); loop region top. 255 = sample end.
 
+    bool synthEnabled = false;
+    int synthWave2 = 0;
+    float synthMix = 0.0f;
+    float synthDetuneRatio = 1.0f;
+
     // Distortion/bitcrusher parameters
     int drive;          // 0-255 (pre-gain boost)
     int crush;          // 0-15 (bit depth reduction, 0=off/16-bit, 15=1-bit)

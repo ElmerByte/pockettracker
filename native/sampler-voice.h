@@ -40,6 +40,8 @@ struct Voice : public IAudioVoice {
     // where interpolation collapses to nearest-neighbour and position steps go irregular.
     // Long WAVs / extracted video audio hit this; double costs the same on arm64 FPUs.
     double position;
+    double synthPhase2 = 0.0;
+    float synthMix = 0.0f;
     int trackId;
     int instrId = -1;        // Instrument index (= sampleId); used for per-instrument spectrum capture
     uint32_t sampleGen = 0;  // AudioEngine::sampleGen[instrId] when triggered; the mix ends a stale one
@@ -168,6 +170,8 @@ struct Voice : public IAudioVoice {
         sampleData = sample;
         sampleDataRight = sampleRight;
         sampleLength = length;
+        synthPhase2 = 0.0;
+        synthMix = instrParams.synthMix;
         trackId = track;
         playbackRate = rate;
         basePlaybackRate = rate;  // Store original rate for table transpose
@@ -433,6 +437,7 @@ struct Voice : public IAudioVoice {
 
     void retrigger(int startPoint) override {
         if (!isActive || !sampleData) return;
+        synthPhase2 = 0.0;
         if (startPoint >= 0 && startPoint <= 255 && sampleLength > 0) {
             // int64 — same overflow as trigger() for long samples
             position = (double)(((int64_t)startPoint * sampleLength) / 255);

@@ -56,6 +56,9 @@ struct Program {
     int32_t sfBank         = 0;
     int32_t sfPreset       = 0;
     int32_t tableTicRate   = 6;
+    int32_t synthWave2 = 0;
+    float synthMix = 0.0f;
+    float synthDetuneRatio = 1.0f;
     int32_t slicingMode    = 0;       // 0 off, 1 CUT, 2 TRU
 
     const int64_t* sliceMarkers = nullptr;

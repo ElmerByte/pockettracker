@@ -598,7 +598,12 @@ Navigate here with **R+RIGHT** from PHRASE. Use **B+LEFT/RIGHT** to switch betwe
 
 On the **TYPE** cell, hold **A** and press LEFT/RIGHT until it reads **synth**.
 No sound file is needed: press **START** to audition, or use it in a phrase.
-**WAVE** selects `sin`, `tri`, `saw`, or `sqr`; **SYNC** sets oscillator hard sync.
+**OSC1** selects `sin`, `tri`, `saw`, or `sqr`; **SYNC** sets its oscillator hard sync.
+**OSC2** selects a second waveform with an independent phase. **MIX** blends the
+oscillators: `00` plays only OSC1, `80` is roughly equal amounts, and `FF` plays
+only OSC2. **DET** tunes OSC2: `80` is centered, with a range of about one semitone
+down or up. Try two saws, MIX `80`, and DET `88` for gentle beating. Both oscillators
+feed the same envelopes, filter, and effects. SYNC affects OSC1 only.
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.

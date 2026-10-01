@@ -392,6 +392,7 @@ enum class HelpTopic {
     GROOVE_SWG,
     SCREEN_INSTRUMENT_FX,
     INST_CHORUS_SEND,
+    SYNTH_OSC2,
 
     COUNT
 };
@@ -2230,6 +2231,11 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "B goes back to INSTRUMENT"}},
     /* INST_CHORUS_SEND */
     {"CHO: chorus send", "How much of this instrument", "feeds the shared chorus."},
+    /* SYNTH_OSC2 */
+    {"OSC2: second oscillator", "Choose sin, tri, saw or sqr.", "MIX blends OSC1 into OSC2.",
+     {"00 is OSC1 only, FF OSC2 only.", "80 gives about equal amounts.",
+      "DET 80 is in tune with OSC1.", "Lower DET flattens OSC2.",
+      "Higher DET sharpens OSC2.", "Range: about one semitone.", "SYNC only changes OSC1."}},
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────
@@ -2465,8 +2471,9 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
         case songcore::InstrumentType::SOUNDFONT: return instrument_sample_topic(true, row, column);
         case songcore::InstrumentType::SYNTH:
             if (row <= 3) return instrument_sample_topic(false, row, column);
-            if (row == 8) return HelpTopic::SCREEN_INSTRUMENT_FX;
-            if (row == 9) return HelpTopic::INST_EQ;
+            if (row == 8 || row == 9) return HelpTopic::SYNTH_OSC2;
+            if (row == 10) return HelpTopic::SCREEN_INSTRUMENT_FX;
+            if (row == 11) return HelpTopic::INST_EQ;
             return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }

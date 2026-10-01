@@ -164,12 +164,18 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     draw_section_source_row(c, x, rowY, nameX, s.cursorRow, s.cursorColumn, 5, t);
     rowY += ROW_HEIGHT * 2;
     static const char* waves[] = {"sin", "tri", "saw", "sqr"};
-    draw_dual_row(c, rowY, nameX, valueX, "WAVE", waves[clamp(ins.synthWave, 0, 3)],
+    draw_dual_row(c, rowY, nameX, valueX, "OSC1", waves[clamp(ins.synthWave, 0, 3)],
                   "SYNC", hex2(ins.synthSync), s.cursorRow, s.cursorColumn, 7, t);
     rowY += ROW_HEIGHT;
-    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 8, t);
+    draw_dual_row(c, rowY, nameX, valueX, "OSC2", waves[clamp(ins.synthWave2, 0, 3)],
+                  "DET", hex2(ins.synthDetune2), s.cursorRow, s.cursorColumn, 8, t);
     rowY += ROW_HEIGHT;
-    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 9, t);
+    draw_parameter_row(c, rowY, nameX, valueX, "MIX", hex2(ins.synthMix), false,
+                       s.cursorRow == 9, t);
+    rowY += ROW_HEIGHT;
+    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 10, t);
+    rowY += ROW_HEIGHT;
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 11, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -432,8 +438,11 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         const int row = s.cursorRow, col = s.cursorColumn;
         if (row == 7 && col == 1) return cc::hex_byte(ins.synthWave, 0, 3);
         if (row == 7 && col == 3) return cc::hex_byte(ins.synthSync, 0, 255);
-        if (row == 8) return cc::read_only();
-        if (row == 9 && col == 1)
+        if (row == 8 && col == 1) return cc::hex_byte(ins.synthWave2, 0, 3);
+        if (row == 9 && col == 1) return cc::hex_byte(ins.synthMix, 0, 255, -1, false, false, false, 0);
+        if (row == 8 && col == 3) return cc::hex_byte(ins.synthDetune2, 0, 255, -1, false, false, false, 128);
+        if (row == 10) return cc::read_only();
+        if (row == 11 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
         return cc::none();
@@ -645,7 +654,10 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
     if (ins.instrumentType == InstrumentType::SYNTH && row >= 7) {
         if (row == 7 && col == 1 && isSet) ins.synthWave = clamp(v, 0, 3);
         else if (row == 7 && col == 3) b255(ins.synthSync);
-        else if (row == 9 && col == 1) {
+        else if (row == 8 && col == 1 && isSet) ins.synthWave2 = clamp(v, 0, 3);
+        else if (row == 9 && col == 1) b255(ins.synthMix);
+        else if (row == 8 && col == 3) b255(ins.synthDetune2);
+        else if (row == 11 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;

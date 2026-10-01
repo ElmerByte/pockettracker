@@ -2,6 +2,7 @@
 // master — processAudioBlock, and processLiveBlock, the live entry every backend calls.
 #include "audio-engine.h"
 #include "engine-voice-ops.h"
+#include "synth-oscillator.h"
 #include "vendor/tsf/tsf.h"    // TSF API declarations only — TSF_IMPLEMENTATION lives in soundfont-voice.cpp
 #include <cstdint>
 #include <cstring>
@@ -936,6 +937,13 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         // derived for THIS piece and ramp across it; the mixer's fader and mute gate were derived
         // for the whole block and must ramp across the block, or a cut piece would step them.
         const int pieceFrames = to - from;
+        const InstrumentParams* synthParams = voice.instrId >= 0 && voice.instrId < 256
+            ? &instrumentParams[voice.instrId] : nullptr;
+        const bool dualOsc = synthParams && synthParams->synthEnabled;
+        const float mixTarget = dualOsc ? synthParams->synthMix : 0.0f;
+        const double phaseStep = dualOsc ? std::abs(modulatedRate) * synthParams->synthDetuneRatio /
+            std::max(1, voice.actualLoopEnd - voice.actualLoopStart) : 0.0;
+        const float mixStart = voice.synthMix;
         for (int i = startFrame; i < to; i++) {
             int idx = (int)voice.position;
             // frac computed in double THEN narrowed: (float)idx is inexact past 2^24, which
@@ -1021,6 +1029,16 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     sample2 = voice.sampleData[quantizedIdx];
                 }
                 float processedSample = sample1 + (sample2 - sample1) * frac;
+                if (dualOsc) {
+                    const float blend = mixStart + (mixTarget - mixStart) *
+                        static_cast<float>(i - startFrame + 1) / std::max(1, to - startFrame);
+                    if (blend > 0.0f) {
+                        const float second = synth::sample(synthParams->synthWave2, voice.synthPhase2,
+                                                           effDownsample);
+                        processedSample = processedSample * (1.0f - blend) + second * blend;
+                    }
+                    synth::advance(voice.synthPhase2, phaseStep);
+                }
                 voice.chain.filter.setInterpolatedCoeffs(t);
                 procL = procR = voice.chain.processMono(processedSample);
             }
@@ -1153,6 +1171,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 }
             }
         } // for (int i = startFrame; i < to; i++)
+        voice.synthMix = mixTarget;
     };
 
     // ⚠️⚠️ **EACH SAMPLER VOICE RUNS TO THE END OF THE BLOCK BEFORE THE NEXT STARTS, IN PIECES CUT WHERE
