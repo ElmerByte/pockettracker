@@ -9,26 +9,9 @@ namespace pt::ui {
 
 namespace {
 
-songcore::ModSlot default_slot(int slot) {
-    songcore::ModSlot env;
-    env.type = songcore::ModType::ADSR;
-    env.dest = slot == 0 ? songcore::ModDest::VOLUME : songcore::ModDest::FILTER_CUTOFF;
-    env.amount = slot == 0 ? 255 : 192;
-    env.decay = slot == 0 ? 0 : 6;
-    env.sustain = slot == 0 ? 255 : 0;
-    env.release = 6;
-    return env;
-}
-
-bool slot_active(const songcore::Instrument& ins, int slot) {
-    return slot >= 0 && slot < 2 && slot < static_cast<int>(ins.modSlots.size()) &&
-           ins.modSlots[static_cast<size_t>(slot)].type == songcore::ModType::ADSR &&
-           ins.modSlots[static_cast<size_t>(slot)].dest ==
-               (slot == 0 ? songcore::ModDest::VOLUME : songcore::ModDest::FILTER_CUTOFF);
-}
-
 songcore::ModSlot shown_slot(const songcore::Instrument& ins, int slot) {
-    return slot_active(ins, slot) ? ins.modSlots[static_cast<size_t>(slot)] : default_slot(slot);
+    const auto& envelope = slot == 0 ? ins.synthAmpEnvelope : ins.synthFilterEnvelope;
+    return envelope.value_or(songcore::default_synth_envelope(slot));
 }
 
 // The graph's horizontal stages use the same tick values the engine converts to frames. A fixed
@@ -52,7 +35,7 @@ void EnvelopeEditorModule::draw(Canvas& c, const songcore::Instrument& ins, int 
     c.draw_text("INST " + hex2(ins.id) + (slot == 0 ? "  AMP ENV" : "  FILTER ENV"), 10, 34,
                 t.textParam,
                 CHAR_SPACING, FONT_SCALE);
-    if (!slot_active(ins, slot))
+    if (!(slot == 0 ? ins.synthAmpEnvelope : ins.synthFilterEnvelope))
         c.draw_text("OFF - EDIT TO ENABLE", 10, 55, t.textEmpty, CHAR_SPACING, FONT_SCALE);
 
     constexpr int left = 10, top = 78, width = 620, height = 170;
@@ -97,7 +80,7 @@ void EnvelopeEditorModule::draw(Canvas& c, const songcore::Instrument& ins, int 
 CursorContext EnvelopeEditorModule::cursor_context(const songcore::Instrument& ins, int slot,
                                                     int cursor) const {
     const auto env = shown_slot(ins, slot);
-    const auto defaults = default_slot(slot);
+    const auto defaults = songcore::default_synth_envelope(slot);
     const int values[5] = {env.attack, env.decay, env.sustain, env.release, env.amount};
     const int defaultValues[5] = {defaults.attack, defaults.decay, defaults.sustain,
                                   defaults.release, defaults.amount};
@@ -109,12 +92,10 @@ bool EnvelopeEditorModule::handle_input(songcore::Instrument& ins, int slot, int
                                         const InputAction& action) const {
     if (slot < 0 || slot >= 2 || cursor < 0 || cursor >= 5 ||
         action.type != ActionType::SET_VALUE) return false;
-    if (ins.modSlots.size() < 2) ins.modSlots.resize(4);
-    auto& env = ins.modSlots[static_cast<size_t>(slot)];
-    const bool initialized = !slot_active(ins, slot);
-    if (initialized) {
-        env = default_slot(slot);
-    }
+    auto& stored = slot == 0 ? ins.synthAmpEnvelope : ins.synthFilterEnvelope;
+    const bool initialized = !stored.has_value();
+    if (initialized) stored = songcore::default_synth_envelope(slot);
+    auto& env = *stored;
     int* values[5] = {&env.attack, &env.decay, &env.sustain, &env.release, &env.amount};
     const int next = std::clamp(action.value, 0, 255);
     if (*values[cursor] == next) return initialized;

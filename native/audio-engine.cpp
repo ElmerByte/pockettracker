@@ -830,7 +830,7 @@ void AudioEngine::setInstrumentModulation(int sampleId, int slotIndex,
                                           int attackSamples, int holdSamples, int decaySamples,
                                           float sustainLevel, float lfoHz, int oscShape,
                                           int releaseSamples, int lfoTrigMode) {
-    if (sampleId < 0 || sampleId >= 256 || slotIndex < 0 || slotIndex >= 4) return;
+    if (sampleId < 0 || sampleId >= 256 || slotIndex < 0 || slotIndex >= VOICE_MOD_SLOTS) return;
     InstrumentModSlot& slot = instrumentModSlots.edit(sampleId)[slotIndex];
     slot.type = type;
     slot.dest = dest;
@@ -847,7 +847,7 @@ void AudioEngine::setInstrumentModulation(int sampleId, int slotIndex,
 }
 
 void AudioEngine::initVoiceModSlots(IAudioVoice& voice, int sampleId, int64_t currentFrame, float sampleRate) {
-    for (int m = 0; m < 4; m++) {
+    for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
         const InstrumentModSlot& src = instrumentModSlots[sampleId][m];
         VoiceModSlot& dst = voice.voiceMods[m];
         dst.type = src.type;
@@ -894,7 +894,7 @@ void AudioEngine::initVoiceModSlots(IAudioVoice& voice, int sampleId, int64_t cu
 
 void AudioEngine::clearInstrumentModulation(int sampleId) {
     if (sampleId < 0 || sampleId >= 256) return;
-    for (int m = 0; m < 4; m++) {
+    for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
         instrumentModSlots.edit(sampleId)[m] = InstrumentModSlot();
     }
     instrumentModSlots.publish(sampleId);

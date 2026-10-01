@@ -644,8 +644,9 @@ is ignored by other instrument types, and cannot be ramped with AUS/AUF.
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.
-These editors use the first two modulation slots. Open **MODS** with **R+UP** to
-add or change modulation. A note-off starts release; a hard kill cuts the note.
+AMP and FILT have dedicated envelope slots, separate from all four MODS slots.
+Open **MODS** with **R+UP** to add or change modulation without replacing them.
+Older saved synths move their AMP/FILT envelopes out of MOD1/MOD2 when loaded. A note-off starts release; a hard kill cuts the note.
 The **FX** editor provides drive, crush, downsample, filter, and effect sends.
 High saw and square notes may alias because the synth uses a single wavetable per waveform.
 

@@ -7,8 +7,7 @@
 
 namespace pt::ui {
 
-// A visual editor for the synth's volume and filter envelopes. They use the existing first two mod
-// slots; the other two slots and their routing stay available on MODS.
+// Dedicated synth AMP/FILT envelopes; all four MODS slots remain freely assignable.
 class EnvelopeEditorModule {
 public:
     void draw(Canvas& c, const songcore::Instrument& ins, int slot, int cursor,

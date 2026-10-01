@@ -112,7 +112,7 @@ void AudioEngine::triggerSoundfontNote(const ScheduledNote& note, int frame, int
     if (haveInstrument) {
         initVoiceModSlots(sv, note.sampleId, currentFrame, sampleRate);
     } else {
-        for (int m = 0; m < 4; m++) sv.voiceMods[m] = VoiceModSlot{};
+        for (int m = 0; m < VOICE_MOD_SLOTS; m++) sv.voiceMods[m] = VoiceModSlot{};
     }
     sv.chain.reset(sampleRate, /*keepToneState=*/wasSounding);
     sv.chain.filter.setParams(ip.filterType, ip.filterCut, ip.filterRes, ip.filterDrive,
@@ -790,7 +790,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
 
         // Snapshot envValues before advancing so the mix loop can interpolate
         // per-sample (eliminates block-rate staircase artifacts on short envelopes).
-        for (int m = 0; m < 4; m++) voice.voiceMods[m].prevEnvValue = voice.voiceMods[m].envValue;
+        for (int m = 0; m < VOICE_MOD_SLOTS; m++) voice.voiceMods[m].prevEnvValue = voice.voiceMods[m].envValue;
         updateVoiceModulation(voice, frames, sampleRate);
 
         // PAN modulation: snapshot before update so the mix loop can interpolate per-sample
@@ -807,7 +807,9 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         voice.chain.filter.snapshotCoeffs();
         if (voice.chain.filter.enabled() &&
                 (fabsf(voice.params.mod[PARAM_FILTER_CUT]) > 0.5f ||
-                 fabsf(voice.params.mod[PARAM_FILTER_RES]) > 0.5f)) {
+                 fabsf(voice.params.mod[PARAM_FILTER_RES]) > 0.5f ||
+                 fabsf(voice.prevModDestValues[PARAM_FILTER_CUT]) > 0.5f ||
+                 fabsf(voice.prevModDestValues[PARAM_FILTER_RES]) > 0.5f)) {
             int modCut = std::max(0, std::min(255, (int)voice.params.get(PARAM_FILTER_CUT)));
             int modRes = std::max(0, std::min(255, (int)voice.params.get(PARAM_FILTER_RES)));
             voice.chain.filter.setParams(voice.chain.filter.type, modCut, modRes, voice.chain.filter.drive, sampleRate);
@@ -817,7 +819,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         // AHD/DRUM done at stage 4; ADSR/TRIG done at stage 5
         if (voice.loopMode != 0) {
             bool hasVolMod = false, allDone = true;
-            for (int m = 0; m < 4; m++) {
+            for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
                 const VoiceModSlot& mod = voice.voiceMods[m];
                 if (mod.dest == 1 && (mod.type == 1 || mod.type == 2 || mod.type == 4 || mod.type == 5)) {
                     hasVolMod = true;
@@ -825,7 +827,9 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                     if (mod.stage < doneStage) allDone = false;
                 }
             }
-            if (hasVolMod && allDone) voice.isActive = false;
+            if ((hasVolMod && allDone) ||
+                (voice.voiceMods[4].type == 2 && voice.voiceMods[4].stage == 5))
+                voice.isActive = false;
         }
     };
 
@@ -1000,7 +1004,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             float panL = voice.prevPanLeft  + (voice.panLeft  - voice.prevPanLeft)  * t;
             float panR = voice.prevPanRight + (voice.panRight - voice.prevPanRight) * t;
             float finalVol = voice.volume;
-            for (int m = 0; m < 4; m++) {
+            for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
                 const VoiceModSlot& mod = voice.voiceMods[m];
                 if (mod.type == 0 || mod.stage == 0) continue;
                 if (mod.dest == 1) {
@@ -1009,7 +1013,9 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                         finalVol = fmaxf(0.0f, finalVol * (1.0f + envAtI * mod.effectiveAmt));
                     } else {
                         float envAtI = mod.prevEnvValue + (mod.envValue - mod.prevEnvValue) * t;
-                        finalVol = fmaxf(0.0f, finalVol + (envAtI - 1.0f) * mod.effectiveAmt);
+                        finalVol = m == 4
+                            ? finalVol * fmaxf(0.0f, 1.0f + (envAtI - 1.0f) * mod.effectiveAmt)
+                            : fmaxf(0.0f, finalVol + (envAtI - 1.0f) * mod.effectiveAmt);
                     }
                 }
             }
@@ -1309,7 +1315,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         float noteVol   = sv.modDestValues[PARAM_VOL];
         float onsetVol  = noteVol;
         bool  hasVolEnv = false, volEnvDone = true;
-        for (int m = 0; m < 4; m++) {
+        for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
             VoiceModSlot& mod = sv.voiceMods[m];
             if (mod.type == 0 || mod.stage == 0 || mod.dest != 1) continue;
             if (mod.type == 3) {  // LFO: bipolar tremolo
@@ -1484,7 +1490,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             // the ADSR mod reaches stage 5.
             if (sv.isReleasingOnly && trackPeak < 0.0005f) {
                 bool adsrReleasing = false;
-                for (int m = 0; m < 4; m++) {
+                for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
                     const VoiceModSlot& mod = sv.voiceMods[m];
                     if (mod.dest == 1 && (mod.type == 2 || mod.type == 5) && mod.stage == 4) {
                         adsrReleasing = true; break;

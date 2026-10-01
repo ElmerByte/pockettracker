@@ -127,7 +127,7 @@ struct ModPush {
 };
 
 struct ModPushes {
-    ModPush slots[4];
+    ModPush slots[6]; // Four user mods, then dedicated synth AMP/FILT.
     bool anyActive = false;   // false → the caller instead issues clearInstrumentModulation(sampleId)
 };
 
@@ -177,13 +177,20 @@ inline ModPushes derive_mod_pushes(const Instrument& ins, int tempo, int sampleR
     const float framesPerTic = frames_per_tic_f(tempo, sampleRate);
     const int   sampleId     = ins.sampleId;
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 6; ++i) {
         ModPush& p = out.slots[i];
         p.sampleId  = sampleId;
         p.slotIndex = i;
 
-        if (i >= static_cast<int>(ins.modSlots.size())) continue;   // cleared slot (type 0)
-        const ModSlot& slot = ins.modSlots[i];
+        const ModSlot* source = nullptr;
+        if (i < 4) {
+            if (i < static_cast<int>(ins.modSlots.size())) source = &ins.modSlots[i];
+        } else if (ins.instrumentType == InstrumentType::SYNTH) {
+            const auto& envelope = i == 4 ? ins.synthAmpEnvelope : ins.synthFilterEnvelope;
+            if (envelope) source = &*envelope;
+        }
+        if (!source) continue;
+        const ModSlot& slot = *source;
         const int dest = mod_dest_code(slot.dest);
 
         // Kotlin clears the slot when the dest is unrouted, and its `when` has no arm for NONE or

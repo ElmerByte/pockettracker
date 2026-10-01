@@ -342,7 +342,7 @@ void SoundfontVoice::noteOffAt(int atFrame) {
     //   parameter) plays out. Silence detection in the render loop fires hardStop().
     //   ⚠️ …unless that release is SHORT, in which case the note ends on our own ramp — see below.
     bool hasActiveAdsrVolMod = false;
-    for (int m = 0; m < 4; m++) {
+    for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
         const VoiceModSlot& mod = voiceMods[m];
         if (mod.dest == 1 && (mod.type == 2 || mod.type == 5)
                 && mod.stage >= 1 && mod.stage <= 3) {
@@ -353,7 +353,7 @@ void SoundfontVoice::noteOffAt(int atFrame) {
 
     if (hasActiveAdsrVolMod) {
         // Keep activeNote so hardStop() can send the deferred note_off to TSF.
-        for (int m = 0; m < 4; m++) {
+        for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
             VoiceModSlot& mod = voiceMods[m];
             if (mod.dest == 1 && (mod.type == 2 || mod.type == 5)
                     && mod.stage >= 1 && mod.stage <= 3) {

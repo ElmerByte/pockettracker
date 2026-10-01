@@ -392,15 +392,15 @@ struct Voice : public IAudioVoice {
      */
     bool releaseVolMods() {
         bool hasRelease = false;
-        for (int m = 0; m < 4; m++) {
+        for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
             VoiceModSlot& vmod = voiceMods[m];
-            if (vmod.dest == 1 && (vmod.type == 2 || vmod.type == 5)) {
+            if ((vmod.dest == 1 || m == 5) && (vmod.type == 2 || vmod.type == 5)) {
                 if (vmod.stage >= 1 && vmod.stage <= 3 && vmod.releaseSamples > 0) {
                     vmod.stage = 4;  // ADSR/TRIG → release
                     vmod.stageCounter = 0;
-                    hasRelease = true;
+                    if (vmod.dest == 1) hasRelease = true;
                 } else if (vmod.stage == 4) {
-                    hasRelease = true;
+                    if (vmod.dest == 1) hasRelease = true;
                 }
             }
         }

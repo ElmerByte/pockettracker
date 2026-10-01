@@ -363,6 +363,17 @@ struct ModSlot {
     int lfoFreq = 0x40;
 };
 
+inline ModSlot default_synth_envelope(int slot) {
+    ModSlot env;
+    env.type = ModType::ADSR;
+    env.dest = slot == 0 ? ModDest::VOLUME : ModDest::FILTER_CUTOFF;
+    env.amount = slot == 0 ? 255 : 192;
+    env.decay = slot == 0 ? 0 : 6;
+    env.sustain = slot == 0 ? 255 : 0;
+    env.release = 6;
+    return env;
+}
+
 /**
  * ModSlot.rowCount() — how many rows this slot occupies on the MODS screen, TYPE row included.
  *
@@ -538,6 +549,7 @@ struct Instrument {
     int loopStart = 0x00, loopEnd = 0xFF;
     std::optional<std::string> sampleFilePath;   // null
     int tableId = -1, tableTicRate = 0x06;
+    std::optional<ModSlot> synthAmpEnvelope, synthFilterEnvelope;
     std::vector<ModSlot> modSlots = std::vector<ModSlot>(4);  // Array<ModSlot>(4)
     InstrumentType instrumentType = InstrumentType::SAMPLER;
     int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square, 4 noise

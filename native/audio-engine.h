@@ -1213,7 +1213,7 @@ private:
     // copy and publishes it; the audio thread reads its own copy, pulled at one point in its block
     // (syncInstrumentData). A setter that forgets to publish is an edit nobody hears.
     StagedTable<InstrumentParams, 256>                        instrumentParams;
-    StagedTable<std::array<InstrumentModSlot, 4>, 256>        instrumentModSlots;   // [sampleId][slot]
+    StagedTable<std::array<InstrumentModSlot, VOICE_MOD_SLOTS>, 256>        instrumentModSlots;   // [sampleId][slot]
     // The engine's own copy of every instrument, keyed by INSTRUMENT id — not by sampleId, which two
     // instruments can share. Read at the trigger through programView(). See setProgram().
     struct ProgramRow {

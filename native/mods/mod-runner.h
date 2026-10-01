@@ -24,6 +24,8 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
         voice.modSourceValues[MOD_SRC_ENV0 + m] = 0.0f;
         voice.modSourceValues[MOD_SRC_LFO0 + m] = 0.0f;
     }
+    voice.modSourceValues[MOD_SRC_AMP_ENV] = 0.0f;
+    voice.modSourceValues[MOD_SRC_FILTER_ENV] = 0.0f;
     voice.modSourceValues[MOD_SRC_NONE] = 0.0f;  // Always 0 — required for via=NONE paths.
 
     // Step 3: Mod-to-mod routing — compute effectiveAmt / effectiveRateMult per slot.
@@ -51,8 +53,13 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
         }
     }
 
+    for (int m = 4; m < VOICE_MOD_SLOTS; ++m) {
+        voice.voiceMods[m].effectiveAmt = voice.voiceMods[m].amount;
+        voice.voiceMods[m].effectiveRateMult = 1.0f;
+    }
+
     // Step 4: Tick each active mod slot and write envValue to the source array.
-    for (int m = 0; m < 4; m++) {
+    for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
         VoiceModSlot& mod = voice.voiceMods[m];
         if (mod.type == 0 || mod.stage == 0) continue;
 
@@ -74,28 +81,24 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
         // VOL (dest=1) is handled per-sample in the mix loop via prevEnvValue.
         // MOD_* (dest≥7) are handled by the mod-to-mod system above.
         // SCALAR (type=6) reuses the LFO slot — degenerate LFO that never oscillates.
-        ModSourceId srcId = (mod.type == 3 || mod.type == 6)
-            ? (ModSourceId)(MOD_SRC_LFO0 + m)
-            : (ModSourceId)(MOD_SRC_ENV0 + m);
+        ModSourceId srcId = mod_source_for(m, mod.type);
         voice.modSourceValues[srcId] = mod.envValue;
     }
 
     // Step 6: Build routes array (user routes + 4 fixed sequencer routes).
-    // Capacity: 4 user routes + 4 fixed sequencer routes = 8 total.
+    // Capacity: 6 mod routes + 4 fixed sequencer routes = 10 total.
     // User routes are rebuilt each block because effectiveAmt changes with mod-to-mod.
     // VOL (dest=1), STA and MOD_* (dest=7..10) are excluded from user routes.
-    ModRoute routes[8];
+    ModRoute routes[VOICE_MOD_SLOTS + 4];
     int routeCount = 0;
 
-    for (int m = 0; m < 4; m++) {
+    for (int m = 0; m < VOICE_MOD_SLOTS; m++) {
         const VoiceModSlot& mod = voice.voiceMods[m];
         if (mod.type == 0) continue;
         if (mod.dest == 0 || mod.dest == 1) continue;  // NONE or VOL (per-sample path)
         if (mod.dest >= 7 && mod.dest <= 10) continue;                    // STA / MOD_AMT / MOD_RATE / MOD_BOTH
 
-        ModSourceId srcId = (mod.type == 3 || mod.type == 6)
-            ? (ModSourceId)(MOD_SRC_LFO0 + m)
-            : (ModSourceId)(MOD_SRC_ENV0 + m);
+        ModSourceId srcId = mod_source_for(m, mod.type);
         ParamId destId;
         float   scale;
         switch (mod.dest) {

@@ -19,6 +19,8 @@
 // applied per-sample in the mix loop with envelope interpolation for click-free fades.
 // TABLE_VOL × phraseVol × instrVol IS accumulated via the fixed VOL route into modDestValues[].
 
+inline constexpr int VOICE_MOD_SLOTS = 6; // Four user slots + dedicated synth AMP/FILT.
+
 enum ParamId {
     PARAM_VOL          = 0,  // Volume: 0.0–1.0
     PARAM_PAN          = 1,  // Pan: 0.0=left, 0.5=center, 1.0=right
@@ -101,8 +103,14 @@ enum ModSourceId {
     // Per-note scalar sources — set at note-on from Kotlin scheduler, constant for note's lifetime
     MOD_SRC_PHRASE_VOL,   // 0.0–1.0 from phrase step volume column (or Vxx effect at trigger)
 
-    MOD_SRC_COUNT  // = 17
+    MOD_SRC_AMP_ENV, MOD_SRC_FILTER_ENV,
+    MOD_SRC_COUNT
 };
+
+inline ModSourceId mod_source_for(int slot, int type) {
+    if (slot >= 4) return slot == 4 ? MOD_SRC_AMP_ENV : MOD_SRC_FILTER_ENV;
+    return static_cast<ModSourceId>((type == 3 || type == 6 ? MOD_SRC_LFO0 : MOD_SRC_ENV0) + slot);
+}
 
 // ===================================
 // VOICEMODSLOT — per-voice modulation state machine (one per instrument mod slot)
@@ -203,7 +211,7 @@ public:
     // modSourceValues[] — each state machine writes its output here once per block.
     // modDestValues[]   — processRoutes() accumulates weighted source values here.
     // prevModDestValues[]— snapshot at start of each block for sub-block interpolation.
-    VoiceModSlot voiceMods[4];
+    VoiceModSlot voiceMods[VOICE_MOD_SLOTS];
     float modSourceValues[MOD_SRC_COUNT]{};
     float modDestValues[PARAM_COUNT]{};
     float prevModDestValues[PARAM_COUNT]{};

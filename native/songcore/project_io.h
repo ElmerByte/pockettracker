@@ -298,6 +298,29 @@ inline Instrument parse_instrument(const json& j, int index) {
               i.midiCC[s].value = get_int(e, "value", i.midiCC[s].value);
           }
       } }
+    const bool dedicated = j.contains("synthAmpEnvelope") || j.contains("synthFilterEnvelope");
+    const char* names[] = {"synthAmpEnvelope", "synthFilterEnvelope"};
+    std::optional<ModSlot>* envelopes[] = {&i.synthAmpEnvelope, &i.synthFilterEnvelope};
+    for (int slot = 0; slot < 2; ++slot) {
+        if (dedicated) {
+            auto it = j.find(names[slot]);
+            if (it != j.end() && it->is_object()) {
+                auto env = parse_mod_slot(*it);
+                if (env.type == ModType::ADSR) {
+                    env.dest = slot == 0 ? ModDest::VOLUME : ModDest::FILTER_CUTOFF;
+                    *envelopes[slot] = env;
+                }
+            }
+        } else if (i.instrumentType == InstrumentType::SYNTH &&
+                   slot < static_cast<int>(i.modSlots.size())) {
+            auto& old = i.modSlots[slot];
+            const auto dest = slot == 0 ? ModDest::VOLUME : ModDest::FILTER_CUTOFF;
+            if (old.type == ModType::ADSR && old.dest == dest) {
+                *envelopes[slot] = old;
+                old = ModSlot{};
+            }
+        }
+    }
     return i;
 }
 
@@ -751,6 +774,12 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     for (const auto& m : i.modSlots) { w.element(); emit_mod_slot(w, m); }
     w.end_array();
     if (i.instrumentType != InstrumentType::SAMPLER) w.field_string("instrumentType", instrument_type_name(i.instrumentType));
+    if (i.instrumentType == InstrumentType::SYNTH || i.synthAmpEnvelope) {
+        w.key("synthAmpEnvelope"); emit_mod_slot(w, i.synthAmpEnvelope.value_or(ModSlot{}));
+    }
+    if (i.instrumentType == InstrumentType::SYNTH || i.synthFilterEnvelope) {
+        w.key("synthFilterEnvelope"); emit_mod_slot(w, i.synthFilterEnvelope.value_or(ModSlot{}));
+    }
     if (i.synthWave != 0) w.field_int("synthWave", i.synthWave);
     if (i.synthWave2 != 0) w.field_int("synthWave2", i.synthWave2);
     if (i.synthPulseWidth1 != 128) w.field_int("synthPulseWidth1", i.synthPulseWidth1);

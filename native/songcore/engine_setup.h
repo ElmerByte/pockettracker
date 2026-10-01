@@ -754,17 +754,9 @@ void set_instrument_type(Engine* engine, Project& project, int id, InstrumentTyp
     const InstrumentType oldType = ins.instrumentType;
     ins.instrumentType = newType;
 
-    if (newType == InstrumentType::SYNTH && ins.modSlots.empty()) ins.modSlots.resize(4);
-
-    if (newType == InstrumentType::SYNTH &&
-        std::all_of(ins.modSlots.begin(), ins.modSlots.end(),
-                    [](const ModSlot& slot) { return slot.type == ModType::NONE; })) {
-        // A looping oscillator needs a release envelope; the regular MODS screen can edit it.
-        ins.modSlots[0].type = ModType::ADSR;
-        ins.modSlots[0].dest = ModDest::VOLUME;
-        ins.modSlots[0].sustain = 255;
-        ins.modSlots[0].release = 6;
-    }
+    if (newType == InstrumentType::SYNTH && oldType != InstrumentType::SYNTH &&
+        !ins.synthAmpEnvelope)
+        ins.synthAmpEnvelope = default_synth_envelope(0);
 
     // ⚠️ Two INDEPENDENT tests, not an if/else on "is it a SoundFont" — that shape was correct only
     // while there were exactly two types, and EXTERNAL (MIDI plan §7) owns NEITHER source, so it must
