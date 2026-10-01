@@ -30,6 +30,7 @@
 #include "ui/modules/confirm_dialog.h"
 #include "ui/modules/effects_editor.h"
 #include "ui/modules/envelope_editor.h"
+#include "ui/modules/chord_banks.h"
 #include "ui/modules/eq_editor.h"
 #include "ui/modules/file_browser.h"
 #include "ui/modules/groove_editor.h"
@@ -180,6 +181,7 @@ private:
     NavigationMapModule   navigationMap_;
     FileBrowserModule     fileBrowser_;   // full-screen: draw() returns before the furniture
     SampleEditorModule    sampleEditor_;  // full-screen too — a waveform wants the width
+    ChordBanksModule chordBanks_;
     EnvelopeEditorModule  envelopeEditor_;
     InstrumentFxEditorModule instrumentFxEditor_;
     QwertyKeyboardOverlay qwerty_;        // modal: drawn LAST, over everything, including the browser

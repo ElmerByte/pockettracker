@@ -264,9 +264,26 @@ inline Instrument parse_instrument(const json& j, int index) {
     i.synthPulseWidth2 = std::clamp(get_int(j, "synthPulseWidth2", i.synthPulseWidth2), 0, 255);
     i.synthMix = std::clamp(get_int(j, "synthMix", i.synthMix), 0, 255);
     i.synthDetune2 = std::clamp(get_int(j, "synthDetune2", i.synthDetune2), 0, 255);
-    i.synthChordMode = std::clamp(get_int(j, "synthChordMode", i.synthChordMode), 0, 6);
-    i.synthChordInterval2 = std::clamp(get_int(j, "synthChordInterval2", i.synthChordInterval2), -24, 24);
-    i.synthChordInterval3 = std::clamp(get_int(j, "synthChordInterval3", i.synthChordInterval3), -24, 24);
+    auto banks = j.find("synthChordBanks");
+    if (banks != j.end() && banks->is_array()) {
+        i.synthChordMode = std::clamp(get_int(j, "synthChordMode", 0), 0, 2);
+        i.synthChordBank = std::clamp(get_int(j, "synthChordBank", 0), 0, 15);
+        for (size_t bank = 0; bank < 16 && bank < banks->size(); ++bank) {
+            const auto& row = (*banks)[bank];
+            if (!row.is_array()) continue;
+            for (size_t col = 0; col < 2 && col < row.size(); ++col)
+                if (row[col].is_number_integer())
+                    i.synthChordBanks[bank][col] = std::clamp(row[col].get<int>(), -24, 24);
+        }
+    } else {
+        const int oldMode = std::clamp(get_int(j, "synthChordMode", 0), 0, 6);
+        constexpr int oldBanks[] = {0,0,0,1,3,4,8};
+        i.synthChordMode = std::min(oldMode, 2);
+        i.synthChordBank = oldBanks[oldMode];
+        i.synthChordBanks[8] = {
+            std::clamp(get_int(j, "synthChordInterval2", 4), -24, 24),
+            std::clamp(get_int(j, "synthChordInterval3", 7), -24, 24)};
+    }
     i.synthChordDetune = std::clamp(get_int(j, "synthChordDetune", i.synthChordDetune), 0, 255);
     i.synthChordWidth = std::clamp(get_int(j, "synthChordWidth", i.synthChordWidth), 0, 255);
     i.synthSync = std::max(0, std::min(255, get_int(j, "synthSync", i.synthSync)));
@@ -367,6 +384,14 @@ inline std::vector<T> parse_pool(const json& j, const char* k, F&& parse_elem) {
 
 // Parse a decoded .ptp JSON object into a Project (scalar/field defaults for anything missing).
 // Pools are taken verbatim; call normalize_project() to repair pool sizes as the loader does.
+template<class Row> inline void migrate_legacy_chord_fx(Row& row) {
+    constexpr int values[] = {255,254,0,1,3,4,8};
+    int* types[] = {&row.fx1Type, &row.fx2Type, &row.fx3Type};
+    int* data[] = {&row.fx1Value, &row.fx2Value, &row.fx3Value};
+    for (int n = 0; n < 3; ++n)
+        if (*types[n] == 0x3E) *data[n] = values[std::clamp(*data[n], 0, 6)];
+}
+
 inline Project parse_project(const json& j) {
     using namespace detail;
     Project p;  // scalar members hold their field defaults; pools start EMPTY
@@ -433,6 +458,10 @@ inline Project parse_project(const json& j) {
               if ((int)p.midiMappings.size() >= MIDI_MAP_MAX) break;
               if (e.is_object()) p.midiMappings.push_back(parse_midi_mapping(e));
           } }
+    if (get_int(j, "synthChordBanksVersion", 0) == 0) {
+        for (auto& phrase : p.phrases) for (auto& row : phrase.steps) migrate_legacy_chord_fx(row);
+        for (auto& table : p.tables) for (auto& row : table.rows) migrate_legacy_chord_fx(row);
+    }
     return p;
 }
 
@@ -447,6 +476,8 @@ inline InstrumentPreset parse_instrument_preset(const json& j) {
         for (const auto& e : *tr) rows.push_back(detail::parse_table_row(e));
         ip.tableRows = std::move(rows);
     }
+    if (detail::get_int(j, "synthChordBanksVersion", 0) == 0 && ip.tableRows)
+        for (auto& row : *ip.tableRows) migrate_legacy_chord_fx(row);
     return ip;
 }
 
@@ -787,8 +818,14 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.synthMix != 0) w.field_int("synthMix", i.synthMix);
     if (i.synthDetune2 != 128) w.field_int("synthDetune2", i.synthDetune2);
     if (i.synthChordMode != 0) w.field_int("synthChordMode", i.synthChordMode);
-    if (i.synthChordInterval2 != 4) w.field_int("synthChordInterval2", i.synthChordInterval2);
-    if (i.synthChordInterval3 != 7) w.field_int("synthChordInterval3", i.synthChordInterval3);
+    if (i.synthChordBank != 0) w.field_int("synthChordBank", i.synthChordBank);
+    w.key("synthChordBanks"); w.begin_array();
+    for (const auto& bank : i.synthChordBanks) {
+        w.element(); w.begin_array();
+        for (int interval : bank) { w.element(); w.value_int(interval); }
+        w.end_array();
+    }
+    w.end_array();
     if (i.synthChordDetune != 32) w.field_int("synthChordDetune", i.synthChordDetune);
     if (i.synthChordWidth != 128) w.field_int("synthChordWidth", i.synthChordWidth);
     if (i.synthSync != 0) w.field_int("synthSync", i.synthSync);
@@ -849,6 +886,7 @@ inline std::string serialize_project(const Project& p) {
     using namespace detail;
     JsonWriter w{JsonLayout::Minified};
     w.begin_object();
+    w.field_int("synthChordBanksVersion", 1);
     if (p.version != 0)         w.field_int("version", p.version);
     if (p.name != "UNTITLED")   w.field_string("name", p.name);
     if (p.tempo != 128)         w.field_int("tempo", p.tempo);
@@ -948,6 +986,7 @@ inline std::string serialize_instrument_preset(const InstrumentPreset& ip) {
     using namespace detail;
     JsonWriter w{JsonLayout::Minified};
     w.begin_object();
+    w.field_int("synthChordBanksVersion", 1);
     if (ip.version != 1) w.field_int("version", ip.version);
     w.key("instrument");
     emit_instrument(w, ip.instrument);

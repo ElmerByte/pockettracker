@@ -85,6 +85,7 @@
 #include "ui/modules/instrument_editor.h"
 #include "ui/modules/instrument_fx_editor.h"
 #include "ui/modules/envelope_editor.h"
+#include "ui/modules/chord_banks.h"
 #include "ui/modules/instrument_pool.h"
 #include "ui/modules/midi_map_editor.h"
 #include "ui/modules/midi_settings.h"
@@ -802,6 +803,7 @@ class InputDispatcher {
     ScaleModule            scale_{};
     InstrumentEditorModule instrument_{};
     InstrumentFxEditorModule instrumentFx_{};
+    ChordBanksModule chordBanks_;
     EnvelopeEditorModule envelope_{};
     InstrumentPoolModule   pool_{};
     ModulationModule       mods_{};

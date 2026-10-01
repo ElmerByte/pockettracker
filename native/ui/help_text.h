@@ -2247,10 +2247,10 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "MIX and DET2 can be modulated."}},
     /* SYNTH_CHORD */
     {"CHD: chord and unison", "One phrase note is the root.", "Three notes share the synth.",
-     {"UNI: three copies of the root.", "MAJ, MIN, SUS and PWR: chords.",
-      "INT2 and INT3: signed semitones.", "Editing intervals selects CUS.",
+     {"UNI: three copies of the root.", "BNK: selected bank 00 to 0F.",
+      "BANK EDIT: signed INT2 and INT3.", "START selects and plays a bank.",
       "SPR detunes up to 25 cents.", "WIDTH 00 mono, FF full stereo.",
-      "OFF keeps the original sound."}},
+      "CHD FX: 00-0F, FE uni, FF off."}},
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────
@@ -2374,6 +2374,7 @@ inline HelpTopic help_screen_topic(ScreenType screen) {
         case ScreenType::SETTINGS:      return HelpTopic::SCREEN_SETTINGS;
         case ScreenType::SAMPLE_EDITOR: return HelpTopic::SCREEN_SAMPLE_EDITOR;
         case ScreenType::ENVELOPE_EDITOR: return HelpTopic::SCREEN_MODS;
+        case ScreenType::CHORD_BANKS: return HelpTopic::SYNTH_CHORD;
         case ScreenType::INSTRUMENT_FX: return HelpTopic::SCREEN_INSTRUMENT_FX;
         case ScreenType::MIDI:          return HelpTopic::SCREEN_MIDI;
         case ScreenType::MIDI_MAP:      return HelpTopic::SCREEN_MIDI_MAP;

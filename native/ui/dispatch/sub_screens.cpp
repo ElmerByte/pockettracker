@@ -147,6 +147,12 @@ bool InputDispatcher::instrument_open_at_cursor() {
     const int         row  = s_.instrumentCursorRow;
     const int         col  = s_.instrumentCursorColumn;
 
+    if (ins.instrumentType == songcore::InstrumentType::SYNTH && row == 12 && col == 3) {
+        s_.chordBankRow = ins.synthChordBank;
+        s_.chordBankColumn = 0;
+        s_.currentScreen = ScreenType::CHORD_BANKS;
+        return true;
+    }
     if (row == instrument_fx_row(ins.instrumentType) && col == 1) {
         s_.instrumentFxCursor = 0;
         s_.currentScreen = ScreenType::INSTRUMENT_FX;

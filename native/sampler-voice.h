@@ -48,9 +48,7 @@ struct Voice : public IAudioVoice {
     std::array<synth::Noise, 3> synthChordNoise1{{{3}, {5}, {7}}};
     std::array<synth::Noise, 3> synthChordNoise2{{{4}, {6}, {8}}};
     float synthChordBlend = 0.0f;
-    int synthChordOverride = -1; // Per-note CHD; -1 follows the instrument.
-    uint32_t synthChordKey = UINT32_MAX;
-    std::array<float, 3> synthChordOverrideRatio{1, 1, 1};
+    int synthChordOverride = -1; // Per-note CHD: -1 instrument, 0 off, 1 uni, 2..17 banks.
     int trackId;
     int instrId = -1;        // Instrument index (= sampleId); used for per-instrument spectrum capture
     uint32_t sampleGen = 0;  // AudioEngine::sampleGen[instrId] when triggered; the mix ends a stale one

@@ -64,7 +64,8 @@ struct Program {
     int synthPulseWidth1 = 128, synthPulseWidth2 = 128;
     int synthSync = 0;
     bool synthChordEnabled = false;
-    int synthChordInterval2 = 4, synthChordInterval3 = 7, synthChordDetune = 32;
+    std::array<std::array<float, 3>, 16> synthChordBankRatio{};
+    std::array<float, 3> synthChordUnisonRatio{1,1,1};
     std::array<float, 3> synthChordRatio{1.0f, 1.0f, 1.0f};
     std::array<float, 3> synthChordLeft{1.0f/3, 1.0f/3, 1.0f/3};
     std::array<float, 3> synthChordRight{1.0f/3, 1.0f/3, 1.0f/3};

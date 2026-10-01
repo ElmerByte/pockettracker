@@ -423,7 +423,7 @@ inline const std::vector<std::vector<std::string>>& effect_descriptions() {
         /* 43 INS */ {"INS: Instrument for this note", "xx=instrument (00-7F)", "RNL beside or RND below it", "picks a random instrument"},
         /* 44 TIM */ {"TIM: Delay echo time", "xx=time (00-FF = 0-2 sec)", "repeats bend as the time moves",
                       "holds till next TIM or stop"},
-        /* CHD */ {"CHD: Synth chord shape", "00=off 01=uni 02=maj 03=min", "04=sus 05=pwr 06=custom", "this note only - synth only"},
+        /* CHD */ {"CHD: Synth chord bank", "00-0F=instrument chord bank", "FE=unison FF=off", "this note only - synth only"},
         /* 45 LPO */ {"LPO: Loop window slide", "moves the whole loop, both ends", "10=one loop 01=a 16th", "F0=back a loop  adds up"},
         /* 46 MPG */ {"MPG: MIDI program change", "xx=program (00-7F)", "external instruments only"},
         /* 47 MPB */ {"MPB: MIDI pitch bend", "00=down 80=centre FF=up", "absolute - external only"},

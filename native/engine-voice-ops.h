@@ -96,7 +96,9 @@ static inline void voiceSetCrush(IAudioVoice& v, int packed) {
 }
 
 static inline void voiceSetChord(Voice& v, int mode) {
-    v.synthChordOverride = std::clamp(mode, 0, 6);
+    if (mode >= 0 && mode <= 15) v.synthChordOverride = mode + 2;
+    else if (mode == 0xFE) v.synthChordOverride = 1;
+    else if (mode == 0xFF) v.synthChordOverride = 0;
 }
 static inline void voiceSetChord(SoundfontVoice&, int) {}
 static inline void voiceResetChord(Voice& v) { v.synthChordOverride = -1; }

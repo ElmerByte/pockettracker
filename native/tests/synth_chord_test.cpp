@@ -11,6 +11,7 @@
 #include "songcore/engine_consumer.h"
 #include "ui/fx_helper.h"
 #include "ui/modules/instrument_editor.h"
+#include "ui/modules/chord_banks.h"
 #include "ui/instrument_row_layout.h"
 
 static std::vector<float> render(songcore::Instrument ins, float pitch = 220, int chordFx = -1, bool table = false, bool restart = false) {
@@ -32,7 +33,7 @@ static std::vector<float> render(songcore::Instrument ins, float pitch = 220, in
     if (chordFx >= 0 && !table)
         engine->scheduleVoiceCc(1, 0, songcore::CC_SYNTH_CHORD, chordFx / 255.0f);
     if (restart) {
-        engine->scheduleVoiceCc(24000, 0, songcore::CC_SYNTH_CHORD, 3 / 255.0f);
+        engine->scheduleVoiceCc(24000, 0, songcore::CC_SYNTH_CHORD, 1 / 255.0f);
         engine->scheduleNote(48000, 0, 0, pitch, 48000.0f / 1024, 0.5f);
     }
     engine->scheduleNoteOff(restart ? 72000 : 48000, 0);
@@ -72,7 +73,7 @@ int main() {
     // Off ignores every bank setting and keeps the previous synth path bit-for-bit.
     auto disabled = ins;
     disabled.synthChordDetune = 255; disabled.synthChordWidth = 255;
-    disabled.synthChordInterval2 = -24; disabled.synthChordInterval3 = 24;
+    disabled.synthChordBanks[0] = {-24,24};
     assert(render(disabled) == original);
 
     ins.synthChordMode = 2;
@@ -98,10 +99,10 @@ int main() {
     assert(unison.synthChordRatio[0] < 1 && unison.synthChordRatio[1] == 1 && unison.synthChordRatio[2] > 1);
     assert(std::abs(unison.synthChordRatio[0] * unison.synthChordRatio[2] - 1) < 0.000001f);
     render(ins);
-    for (int mode = 1; mode <= 6; ++mode) {
+    for (int mode = 0; mode < 16; ++mode) {
         auto patch = ins;
-        patch.synthChordMode = mode;
-        patch.synthChordInterval2 = -12; patch.synthChordInterval3 = 7;
+        patch.synthChordMode = 2; patch.synthChordBank = mode;
+        patch.synthChordBanks[8] = {-12,7};
         patch.synthWave = 3; patch.synthWave2 = 4; patch.synthMix = 24;
         patch.synthPulseWidth1 = 40; patch.synthSync = 100;
         patch.filterType = "lp"; patch.filterCut = 120;
@@ -117,11 +118,11 @@ int main() {
     auto fxIns = ins;
     fxIns.synthChordMode = 0; fxIns.synthChordDetune = 0; fxIns.synthChordWidth = 0;
     for (bool table : {false, true}) {
-        const auto audio = render(fxIns, 220, 3, table);
+        const auto audio = render(fxIns, 220, 1, table);
         assert(amplitude(audio, 220 * std::pow(2.0, 3 / 12.0)) > 0.04);
         assert(amplitude(audio, 220 * std::pow(2.0, 4 / 12.0)) < 0.01);
     }
-    const auto changing = render(fxIns, 220, 2, false, true);
+    const auto changing = render(fxIns, 220, 0, false, true);
     const double majThird = 220 * std::pow(2.0, 4 / 12.0);
     const double minThird = 220 * std::pow(2.0, 3 / 12.0);
     assert(amplitude(changing, majThird, 0, 4800, 22000) > 0.04);
@@ -130,7 +131,7 @@ int main() {
     assert(amplitude(changing, majThird, 0, 52000, 68000) < 0.01);
     assert(amplitude(changing, 220, 0, 52000, 68000) > 0.1);
     fxIns.synthChordMode = 2;
-    const auto offFx = render(fxIns, 220, 0);
+    const auto offFx = render(fxIns, 220, 255);
     assert(amplitude(offFx, 220) > 0.1);
     assert(amplitude(offFx, 220 * std::pow(2.0, 4 / 12.0)) < 0.01);
 
@@ -159,8 +160,8 @@ int main() {
         }
     }
     assert(sameStep && heldStep);
-    assert(effect_name(songcore::FX_CHD) == "CHD" && effect_value_max(songcore::FX_CHD) == 6);
-    assert(pt::ui::effect_descriptions()[effect_type_index(songcore::FX_CHD)][0] == "CHD: Synth chord shape");
+    assert(effect_name(songcore::FX_CHD) == "CHD" && effect_value_max(songcore::FX_CHD) == 255);
+    assert(pt::ui::effect_descriptions()[effect_type_index(songcore::FX_CHD)][0] == "CHD: Synth chord bank");
     assert(resolve_cc_param(fxIns, CC_SYNTH_CHORD) == -1); // Never sends a masked MIDI CC.
     assert(synth_chord_intervals(ins) == (std::array<int,3>{0,0,0}));
     auto project = make_default_project();
@@ -168,11 +169,52 @@ int main() {
     assert(loaded.instruments[0].synthChordMode == 0);
 
     pt::ui::InstrumentEditorModule editor;
-    ins.synthChordMode = 3;
-    assert(editor.handle_input(ins, 12, 3, pt::ui::InputAction::set_value(10)).modified);
-    assert(ins.synthChordMode == 6 && ins.synthChordInterval2 == 3 && ins.synthChordInterval3 == 10);
-    assert(editor.handle_input(ins, 12, 1, pt::ui::InputAction::set_value(-12)).modified);
-    assert(ins.synthChordInterval2 == -12);
+    pt::ui::ChordBanksModule banks;
+    ins.synthChordMode = 2; ins.synthChordBank = 1;
+    assert(banks.handle_input(ins, 1, 1, pt::ui::InputAction::set_value(10)));
+    assert(ins.synthChordBanks[1] == (std::array<int,2>{3,10}));
+    assert(banks.handle_input(ins, 8, 0, pt::ui::InputAction::set_value(-12)));
+    assert(ins.synthChordBanks[8][0] == -12);
+    assert(banks.handle_input(ins, 8, 0, pt::ui::InputAction::set_value(-100)));
+    assert(ins.synthChordBanks[8][0] == -24);
+    assert(banks.handle_input(ins, 8, 0, pt::ui::on_a_b(banks.cursor_context(ins,8,0))));
+    assert(ins.synthChordBanks[8][0] == 0);
+    assert(pt::ui::decrement(banks.cursor_context(ins,8,0)).value == -1);
+    assert(pt::ui::decrement_fast(banks.cursor_context(ins,8,0)).value == -12);
+    assert(!banks.handle_input(ins, 16, 0, pt::ui::InputAction::set_value(1)));
+    assert(banks.cursor_context(ins, 1, 0).minValue == -24);
+    assert(editor.handle_input(ins, 12, 1, pt::ui::InputAction::set_value(15)).modified);
+    assert(ins.synthChordBank == 15);
+
+    // Legacy fixed shapes, custom intervals and both FX pools migrate once.
+    json legacy = {{"instruments", json::array({{
+        {"instrumentType", "SYNTH"}, {"synthChordMode", 6},
+        {"synthChordInterval2", -12}, {"synthChordInterval3", 10}}})},
+        {"phrases", json::array({{{"steps", json::array({{{"fx1Type", songcore::FX_CHD}, {"fx1Value", 3}}})}}})},
+        {"tables", json::array({{{"rows", json::array({{{"fx2Type", songcore::FX_CHD}, {"fx2Value", 0}}})}}})}};
+    constexpr int oldBank[] = {0,0,0,1,3,4,8};
+    constexpr int oldFx[] = {255,254,0,1,3,4,8};
+    for (int mode=0; mode<=6; ++mode) {
+        auto old = legacy;
+        old["instruments"][0]["synthChordMode"] = mode;
+        old["phrases"][0]["steps"][0]["fx1Value"] = mode;
+        const auto restored = parse_project(old);
+        assert(restored.instruments[0].synthChordMode == std::min(mode,2));
+        assert(restored.instruments[0].synthChordBank == oldBank[mode]);
+        assert(restored.phrases[0].steps[0].fx1Value == oldFx[mode]);
+    }
+    const auto migrated = parse_project(legacy);
+    assert(migrated.instruments[0].synthChordMode == 2 && migrated.instruments[0].synthChordBank == 8);
+    assert(migrated.instruments[0].synthChordBanks[8] == (std::array<int,2>{-12,10}));
+    assert(migrated.phrases[0].steps[0].fx1Value == 1);
+    assert(migrated.tables[0].rows[0].fx2Value == 255);
+    auto saved = serialize_project(migrated);
+    assert(serialize_project(parse_project(json::parse(saved))) == saved);
+    auto legacyPreset = parse_instrument_preset(json{{"instrument", legacy["instruments"][0]},
+        {"tableRows", json::array({{{"fx1Type", songcore::FX_CHD}, {"fx1Value", 6}}})}});
+    assert(legacyPreset.tableRows->at(0).fx1Value == 8);
+    render(fxIns, 220, 254); // explicit unison
+    render(fxIns, 220, 16); // unsupported bank values are ignored
     pt::ui::InstrumentEditorState state{ins}; state.cursorRow = 11; state.cursorColumn = 1;
     assert(editor.handle_input(ins, 11, 1, pt::ui::on_a_b(editor.cursor_context(state))).modified);
     assert(ins.synthChordMode == 0);

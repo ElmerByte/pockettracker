@@ -959,20 +959,9 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             ? dualOsc && synthParams->synthChordEnabled : voice.synthChordOverride > 0;
         const float chordTarget = dualOsc && chordEnabled ? 1.0f : 0.0f;
         const auto* chordRatio = dualOsc ? &synthParams->synthChordRatio : nullptr;
-        if (dualOsc && voice.synthChordOverride > 0) {
-            const uint32_t key = voice.synthChordOverride |
-                ((synthParams->synthChordInterval2 + 24) << 3) |
-                ((synthParams->synthChordInterval3 + 24) << 9) |
-                (synthParams->synthChordDetune << 15);
-            // Derive only when CHD or the instrument settings change, never per sample.
-            if (voice.synthChordKey != key) {
-                voice.synthChordOverrideRatio = synth::chordRatios(voice.synthChordOverride,
-                    synthParams->synthChordInterval2, synthParams->synthChordInterval3,
-                    synthParams->synthChordDetune);
-                voice.synthChordKey = key;
-            }
-            chordRatio = &voice.synthChordOverrideRatio;
-        }
+        if (dualOsc && voice.synthChordOverride > 0)
+            chordRatio = voice.synthChordOverride == 1 ? &synthParams->synthChordUnisonRatio :
+                &synthParams->synthChordBankRatio[voice.synthChordOverride - 2];
         const float chordStart = voice.synthChordBlend;
         const bool renderChord = dualOsc && (chordTarget > 0.0f || chordStart > 0.0f);
         if (renderChord && chordStart == 0.0f) {

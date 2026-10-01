@@ -322,7 +322,7 @@ inline std::string effect_name(int code) {
 // SCA/SCG stop at 0xBF for the same kind of reason and a different arithmetic: their high nibble is a
 // KEY, and there are twelve of those, so 0xC0 and up name a key that does not exist.
 inline constexpr int effect_value_max(int effect_type) {
-    if (effect_type == FX_CHD) return 6;
+    if (effect_type == FX_CHD) return 255;
     if (effect_type == FX_SCA || effect_type == FX_SCG) return 0xBF;
     return (effect_type == FX_TBL || effect_type == FX_GRV ||
             effect_type == FX_EQN || effect_type == FX_EQM ||
@@ -472,7 +472,7 @@ struct ResolvedStepParams {
     std::optional<int> filterModeValue;   // LPF/HPF/BPF cutoff byte
     int filterModeType = 0;               // 1 lp | 2 hp | 3 bp; meaningless unless the above is set
     std::optional<int> driveValue;        // DRV
-    std::optional<int> chordValue;        // CHD — synth-only, per-note shape
+    std::optional<int> chordValue;        // CHD — synth-only, per-note bank
     std::optional<int> crushValue;        // CRU — both nibbles still packed, split at the engine
     std::optional<int> fineTuneValue;     // FIN — authored byte, turned into semitones at the engine
     std::optional<int> tsxMultiplier;     // TSX — already decoded to a signed multiplier
@@ -541,7 +541,10 @@ inline ResolvedStepParams resolve_step_params(const PhraseStep& step,
                 break;
             case FX_DRV:    p.driveValue     = value; break;
             case FX_CRU:    p.crushValue     = value; break;
-            case FX_CHD:    p.chordValue     = std::max(0, std::min(6, value)); break;
+            case FX_CHD:
+                if ((value >= 0 && value <= 15) || value == 254 || value == 255)
+                    p.chordValue = value;
+                break;
             case FX_FIN:    p.fineTuneValue  = value; break;
             // Decoded here, the way PIT is, so the scheduler multiplies by a number rather than by
             // a byte it would have to remember to sign-extend.

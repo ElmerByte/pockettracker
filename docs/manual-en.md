@@ -619,11 +619,21 @@ synth modulation destinations: MIX adds to the blend, while DET2 moves OSC2's
 detune within its existing range. LFOs swing either way; envelopes move upward.
 These destinations are available for synth instruments. They are ignored by
 noise where they control pulse width or pitch.
-**CHD** adds a three-note oscillator bank inside the synth, using one track and
-one phrase root note. Choose `uni` (unison), `maj`, `min`, `sus` (sus4), `pwr`
-(root/fifth/octave), or `cus`. **INT2 / INT3** are signed decimal semitone offsets
-from the root, from -24 to +24; changing either selects custom mode. Set both to
-`+00` for custom unison, `+04 / +07` for major, or `+03 / +07` for minor.
+**CHD** adds three notes inside the synth, using one track and one phrase root
+note. Choose `off`, `uni` (unison), or `bnk` (the selected **BANK**, `00`–`0F`).
+Open **BANK → EDIT >** to edit all 16 banks for this instrument. **INT2 / INT3**
+are signed decimal semitone offsets from the root, from -24 to +24. Move with
+DPAD, edit with A+DPAD, reset a cell with A+B, and press START to select and
+preview the highlighted bank. B returns to the instrument. Editing an unselected
+bank does not change the selected bank until you press START or select BANK.
+
+Factory banks: `00` major (+4,+7), `01` minor (+3,+7), `02` sus2 (+2,+7),
+`03` sus4 (+5,+7), `04` power (+7,+12), `05` diminished (+3,+6),
+`06` augmented (+4,+8), `07` minor seventh without fifth (+3,+10).
+Banks `08`–`0F` start as unison (+0,+0). Every bank is editable; its three-letter
+shape label follows its intervals. Older songs retain their previous custom
+intervals in bank `08`.
+
 **SPR** detunes the outer notes in opposite directions: `00` is exact tuning,
 `FF` is 25 cents each way. **WIDTH** spreads the notes left/center/right:
 `00` is mono and `FF` is full width. Try `uni`, SPR `40`, WIDTH `C0` for a thick pad.
@@ -633,9 +643,9 @@ tripling the volume. Pitch effects transpose the entire bank; intervals are
 chromatic offsets from the root, not independently snapped to the track scale.
 `off` preserves the original synth. These extra pitches are internal audio only;
 phrase columns and MIDI output are unchanged.
-Use **CHD in a phrase or table FX column** to select a shape for the sounding
-synth note: `00` off, `01` unison, `02` major, `03` minor, `04` sus4,
-`05` power, `06` the instrument's custom INT2/INT3. It works alongside a note
+Use **CHD in a phrase or table FX column** to select a bank for the sounding
+synth note: `00`–`0F` select the instrument bank, `FE` selects unison,
+and `FF` turns the chord off. Values `10`–`FD` are ignored. It works alongside a note
 or on a blank note row to change a held chord. Blank FX cells leave it alone;
 a new note returns to the instrument's CHD setting unless it also has CHD FX.
 The instrument's SPR and WIDTH still apply. CHD does not retrigger the envelope,
@@ -2948,7 +2958,7 @@ Open with **A** on an EQ cell.
 | HPF | High-Pass On | `XX` | Switches a high-pass on for this note at cutoff `XX` |
 | BPF | Band-Pass On | `XX` | Switches a band-pass on for this note at centre `XX` |
 | DRV | Overdrive | `XX` | This note's overdrive, `00` clean to `FF` heavy |
-| CHD | Synth Chord | `00–06` | Off, unison, major, minor, sus4, power, custom; this note only, phrase or table |
+| CHD | Synth Chord Bank | `00–0F`, `FE`, `FF` | Instrument bank; FE unison, FF off; this note only, phrase or table |
 | CRU | Crush + Downsample | `XY` | `X` = bits crushed, `Y` = rate drop; both `0` = clean |
 | FIN | Fine Tune | `XX` | `80` in tune, a semitone either way; retunes a note already playing |
 | TSX | Transpose Multiplier | `XX` | How far TSP moves this note: `01` normal, `00` not at all, `FF` the other way. Phrase only |

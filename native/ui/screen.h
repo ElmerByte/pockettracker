@@ -38,7 +38,8 @@ enum class ScreenType {
     // and the append is merely the habit that keeps it free.
     MIDI,       // reached from PROJECT > MIDI; not on the R+DPAD grid (plan §8.1)
     MIDI_MAP,   // …and one level further in, from MIDI > MAPPING. Not on the grid either
-    INSTRUMENT_FX // reached from the instrument's FX button
+    INSTRUMENT_FX, // reached from the instrument's FX button
+    CHORD_BANKS
 };
 
 inline const char* screen_label(ScreenType s) {
@@ -60,6 +61,7 @@ inline const char* screen_label(ScreenType s) {
         case ScreenType::SAMPLE_EDITOR: return "SAMPLE EDITOR";
         case ScreenType::ENVELOPE_EDITOR: return "ENVELOPE EDITOR";
         case ScreenType::INSTRUMENT_FX: return "INSTRUMENT FX";
+        case ScreenType::CHORD_BANKS: return "CHORD BANKS";
         case ScreenType::MIDI:          return "MIDI";
         case ScreenType::MIDI_MAP:      return "MIDI MAPPING";
     }
@@ -92,6 +94,7 @@ inline const char* screen_short_label(ScreenType s) {
         case ScreenType::SAMPLE_EDITOR: return "SE";
         case ScreenType::ENVELOPE_EDITOR: return "ENV";
         case ScreenType::INSTRUMENT_FX: return "FX";
+        case ScreenType::CHORD_BANKS: return "BANK";
         case ScreenType::MIDI:          return "MI";
         case ScreenType::MIDI_MAP:      return "MM";
     }

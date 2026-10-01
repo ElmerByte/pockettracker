@@ -297,7 +297,8 @@ bool InputDispatcher::on_instrument_screen() const {
     return s_.currentScreen == ScreenType::INSTRUMENT ||
            s_.currentScreen == ScreenType::INST_POOL ||
            s_.currentScreen == ScreenType::MODS ||
-           s_.currentScreen == ScreenType::INSTRUMENT_FX;
+           s_.currentScreen == ScreenType::INSTRUMENT_FX ||
+           s_.currentScreen == ScreenType::CHORD_BANKS;
 }
 
 bool InputDispatcher::on_globals_screen() const {
@@ -321,6 +322,9 @@ GrooveState InputDispatcher::groove_state(const Project& p) const {
 
 CursorContext InputDispatcher::cursor_context() const {
     const Project& p = *s_.project;
+    if (s_.currentScreen == ScreenType::CHORD_BANKS)
+        return chordBanks_.cursor_context(p.instruments[static_cast<size_t>(s_.currentInstrument)],
+                                         s_.chordBankRow, s_.chordBankColumn);
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX)
         return instrumentFx_.cursor_context(p.instruments[static_cast<size_t>(s_.currentInstrument)],
                                             s_.instrumentFxCursor);
@@ -458,6 +462,9 @@ CursorContext InputDispatcher::cursor_context() const {
 
 bool InputDispatcher::apply_edit(const InputAction& action) {
     Project& p = host_.edit_project();  // the SAME Project the Sequencer is reading
+    if (s_.currentScreen == ScreenType::CHORD_BANKS)
+        return chordBanks_.handle_input(p.instruments[static_cast<size_t>(s_.currentInstrument)],
+                                       s_.chordBankRow, s_.chordBankColumn, action);
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX)
         return instrumentFx_.handle_input(p.instruments[static_cast<size_t>(s_.currentInstrument)],
                                           s_.instrumentFxCursor, action);
@@ -978,6 +985,9 @@ void InputDispatcher::on_dpad_up() {
     if (theme_open())  { theme_move_cursor(-1, 0); return; }
     if (eq_open())     { eq_move_cursor(0, -1); return; }
     if (on_browser())  { browser_move_cursor(-1, /*page=*/false); return; }
+    if (s_.currentScreen == ScreenType::CHORD_BANKS) {
+        s_.chordBankRow = std::clamp(s_.chordBankRow + (-1), 0, 15); return;
+    }
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX) {
         s_.instrumentFxCursor = std::clamp(s_.instrumentFxCursor + (-1), 0,
                                           InstrumentFxEditorModule::ROWS - 1); return;
@@ -996,6 +1006,9 @@ void InputDispatcher::on_dpad_down() {
     if (theme_open())  { theme_move_cursor(+1, 0); return; }
     if (eq_open())     { eq_move_cursor(0, +1); return; }
     if (on_browser())  { browser_move_cursor(+1, /*page=*/false); return; }
+    if (s_.currentScreen == ScreenType::CHORD_BANKS) {
+        s_.chordBankRow = std::clamp(s_.chordBankRow + (1), 0, 15); return;
+    }
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX) {
         s_.instrumentFxCursor = std::clamp(s_.instrumentFxCursor + (1), 0,
                                           InstrumentFxEditorModule::ROWS - 1); return;
@@ -1018,6 +1031,9 @@ void InputDispatcher::on_dpad_left() {
     if (eq_open())     { eq_move_cursor(-1, 0); return; }
     // LEFT/RIGHT PAGE the browser by a screenful — the one list in the app long enough to need it.
     if (on_browser())  { browser_move_cursor(-BROWSER_VISIBLE_ROWS, /*page=*/true); return; }
+    if (s_.currentScreen == ScreenType::CHORD_BANKS) {
+        s_.chordBankColumn = std::clamp(s_.chordBankColumn + (-1), 0, 1); return;
+    }
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
         s_.envelopeCursor = std::max(0, s_.envelopeCursor - 1); return;
@@ -1031,6 +1047,9 @@ void InputDispatcher::on_dpad_right() {
     if (theme_open())  { theme_move_cursor(0, +1); return; }
     if (eq_open())     { eq_move_cursor(+1, 0); return; }
     if (on_browser())  { browser_move_cursor(+BROWSER_VISIBLE_ROWS, /*page=*/true); return; }
+    if (s_.currentScreen == ScreenType::CHORD_BANKS) {
+        s_.chordBankColumn = std::clamp(s_.chordBankColumn + (1), 0, 1); return;
+    }
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
         s_.envelopeCursor = std::min(4, s_.envelopeCursor + 1); return;

@@ -86,7 +86,7 @@ void InputDispatcher::on_button_a() {
     // or insert a chain on a screen the user cannot even see.
     if (eq_open()) return;
 
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) return;
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::CHORD_BANKS) return;
     if (s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
 
     // A on a cell that OPENS a sub-screen — the two NAME rows and all five EQ cells. Runs BEFORE the
@@ -234,7 +234,7 @@ void InputDispatcher::on_button_b() {
     // would land on the mixer behind it.
     if (eq_open()) { close_eq_editor(); return; }
 
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) {
+    if (s_.currentScreen == ScreenType::CHORD_BANKS || s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) {
         s_.currentScreen = ScreenType::INSTRUMENT;
         return;
     }
@@ -613,6 +613,14 @@ void InputDispatcher::on_start() {
     // ⚠️ …AND IT IS NO LONGER AT UNITY GAIN. The lane borrows the fader of the song cell you came
     // through, so a pad you can only hear through its sends auditions where it actually sits. It is
     // still a ninth voice, and still steals nothing.
+    if (s_.currentScreen == ScreenType::CHORD_BANKS) {
+        auto& ins = host_.edit_project().instruments[static_cast<size_t>(s_.currentInstrument)];
+        if (ins.synthChordMode != 2 || ins.synthChordBank != s_.chordBankRow) {
+            ins.synthChordMode = 2;
+            ins.synthChordBank = s_.chordBankRow;
+            mark_modified();
+        }
+    }
     if (on_instrument_screen()) {
         host_.set_preview_track(audition_track());
         host_.preview_instrument(s_.currentInstrument);

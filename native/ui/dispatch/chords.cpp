@@ -697,7 +697,7 @@ void InputDispatcher::on_b_down() {
 
 void InputDispatcher::on_r_up() {
     if (overlay_swallows(Overlay::QWERTY | Overlay::BROWSER | Overlay::RENDER)) return;
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
+    if (s_.currentScreen == ScreenType::CHORD_BANKS || s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     // R+UP/DOWN steps the RENDER dialog's range to the previous or next part of the song — the one
     // gesture on that panel that moves two values at once, because a part is a start and an end.
     if (render_dialog_open()) { render_dialog_step_section(-1); return; }
@@ -719,7 +719,7 @@ void InputDispatcher::on_r_up() {
 
 void InputDispatcher::on_r_down() {
     if (overlay_swallows(Overlay::QWERTY | Overlay::BROWSER | Overlay::RENDER)) return;
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
+    if (s_.currentScreen == ScreenType::CHORD_BANKS || s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     if (render_dialog_open()) { render_dialog_step_section(+1); return; }
     if (qwerty_open()) { s_.qwerty.layout = 1; clamp_col(s_.qwerty); return; }
     if (on_browser()) { browser_cycle_sort(-1); return; }
@@ -822,7 +822,7 @@ void InputDispatcher::sync_last_edited_on_screen_switch(ScreenType from, ScreenT
 
 void InputDispatcher::on_r_left() {
     if (overlay_swallows(Overlay::QWERTY | Overlay::BROWSER)) return;
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
+    if (s_.currentScreen == ScreenType::CHORD_BANKS || s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     if (qwerty_open()) {
         move_text_cursor_left(s_.qwerty);
         return;
@@ -838,7 +838,7 @@ void InputDispatcher::on_r_left() {
 
 void InputDispatcher::on_r_right() {
     if (overlay_swallows(Overlay::QWERTY | Overlay::BROWSER)) return;
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
+    if (s_.currentScreen == ScreenType::CHORD_BANKS || s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
     if (qwerty_open()) {
         move_text_cursor_right(s_.qwerty);
         return;

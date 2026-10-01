@@ -482,6 +482,7 @@ add_library(pt-ui STATIC
         ui/modules/scale_editor.cpp
         ui/modules/sample_editor.cpp
         ui/modules/envelope_editor.cpp
+    ui/modules/chord_banks.cpp
         ui/modules/settings_editor.cpp
         ui/modules/song_editor.cpp
         ui/modules/table_editor.cpp
