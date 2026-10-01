@@ -42,7 +42,9 @@ android {
         versionName = "0.9.8"
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // -PphoneOnly=true omits the emulator libraries from a shareable phone APK.
+            abiFilters += if (providers.gradleProperty("phoneOnly").orNull == "true")
+                listOf("arm64-v8a") else listOf("arm64-v8a", "x86_64")
         }
 
         externalNativeBuild {
