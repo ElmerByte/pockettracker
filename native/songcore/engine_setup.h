@@ -60,6 +60,7 @@ bool load_synth_wave(Engine& engine, const Instrument& ins) {
         // boundary; fractional ratios create the hard edge and harmonics of oscillator hard sync.
         const float slave = ins.synthSync == 0 ? phase : std::fmod(phase * ratio, 1.0f);
         switch (ins.synthWave) {
+            case 4: pcm[i] = 0.0f; break; // Fresh noise is generated per voice in the mixer.
             case 1: pcm[i] = 1.0f - 4.0f * std::abs(slave - 0.5f); break;
             case 2: pcm[i] = 2.0f * slave - 1.0f; break;
             case 3: pcm[i] = slave < 0.5f ? 1.0f : -1.0f; break;

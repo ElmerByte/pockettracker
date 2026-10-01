@@ -604,6 +604,11 @@ oscillators: `00` plays only OSC1, `80` is roughly equal amounts, and `FF` plays
 only OSC2. **DET** tunes OSC2: `80` is centered, with a range of about one semitone
 down or up. Try two saws, MIX `80`, and DET `88` for gentle beating. Both oscillators
 feed the same envelopes, filter, and effects. SYNC affects OSC1 only.
+Both oscillators also offer **noi** (white noise), generated fresh rather than
+looped at the note pitch. Noise ignores DET and SYNC. For an airy pad, try OSC1
+`tri` or `saw`, OSC2 `noi`, MIX `10`–`20`, a low-pass filter, slow AMP attack and
+release, and a little chorus or reverb send. MIX `FF` gives pure OSC2 noise for
+hats and snares; the filter and envelopes shape it just like the pitched waves.
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.

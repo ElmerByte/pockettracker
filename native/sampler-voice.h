@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <algorithm>
 #include "rng.h"
+#include "synth-oscillator.h"
 #include "mods/mod-system.h"
 #include "effects/instrument-chain.h"
 #include "table-lanes.h"
@@ -41,6 +42,7 @@ struct Voice : public IAudioVoice {
     // Long WAVs / extracted video audio hit this; double costs the same on arm64 FPUs.
     double position;
     double synthPhase2 = 0.0;
+    synth::Noise synthNoise1{1}, synthNoise2{2};
     float synthMix = 0.0f;
     int trackId;
     int instrId = -1;        // Instrument index (= sampleId); used for per-instrument spectrum capture
@@ -171,6 +173,8 @@ struct Voice : public IAudioVoice {
         sampleDataRight = sampleRight;
         sampleLength = length;
         synthPhase2 = 0.0;
+        synthNoise1.trigger(track);
+        synthNoise2.trigger(track);
         synthMix = instrParams.synthMix;
         trackId = track;
         playbackRate = rate;

@@ -258,8 +258,8 @@ inline Instrument parse_instrument(const json& j, int index) {
           for (const auto& m : *it) i.modSlots.push_back(parse_mod_slot(m));
       } }
     { auto it = j.find("instrumentType"); if (it != j.end() && it->is_string()) instrument_type_from_name(it->get<std::string>(), i.instrumentType); }
-    i.synthWave = std::max(0, std::min(3, get_int(j, "synthWave", i.synthWave)));
-    i.synthWave2 = std::clamp(get_int(j, "synthWave2", i.synthWave2), 0, 3);
+    i.synthWave = std::max(0, std::min(4, get_int(j, "synthWave", i.synthWave)));
+    i.synthWave2 = std::clamp(get_int(j, "synthWave2", i.synthWave2), 0, 4);
     i.synthMix = std::clamp(get_int(j, "synthMix", i.synthMix), 0, 255);
     i.synthDetune2 = std::clamp(get_int(j, "synthDetune2", i.synthDetune2), 0, 255);
     i.synthSync = std::max(0, std::min(255, get_int(j, "synthSync", i.synthSync)));

@@ -1030,11 +1030,14 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 }
                 float processedSample = sample1 + (sample2 - sample1) * frac;
                 if (dualOsc) {
+                    if (synthParams->synthWave == synth::NOISE)
+                        processedSample = voice.synthNoise1.sample(effDownsample);
                     const float blend = mixStart + (mixTarget - mixStart) *
                         static_cast<float>(i - startFrame + 1) / std::max(1, to - startFrame);
                     if (blend > 0.0f) {
-                        const float second = synth::sample(synthParams->synthWave2, voice.synthPhase2,
-                                                           effDownsample);
+                        const float second = synthParams->synthWave2 == synth::NOISE
+                            ? voice.synthNoise2.sample(effDownsample)
+                            : synth::sample(synthParams->synthWave2, voice.synthPhase2, effDownsample);
                         processedSample = processedSample * (1.0f - blend) + second * blend;
                     }
                     synth::advance(voice.synthPhase2, phaseStep);

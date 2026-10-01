@@ -527,7 +527,7 @@ struct Instrument {
     int tableId = -1, tableTicRate = 0x06;
     std::vector<ModSlot> modSlots = std::vector<ModSlot>(4);  // Array<ModSlot>(4)
     InstrumentType instrumentType = InstrumentType::SAMPLER;
-    int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square
+    int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square, 4 noise
     int synthWave2 = 0;
     int synthMix = 0;       // 0 OSC1 only, 255 OSC2 only
     int synthDetune2 = 128; // 128 in tune; approximately -100..+100 cents

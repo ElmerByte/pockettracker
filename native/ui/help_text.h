@@ -2232,10 +2232,10 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
     /* INST_CHORUS_SEND */
     {"CHO: chorus send", "How much of this instrument", "feeds the shared chorus."},
     /* SYNTH_OSC2 */
-    {"OSC2: second oscillator", "Choose sin, tri, saw or sqr.", "MIX blends OSC1 into OSC2.",
+    {"OSC2: second oscillator", "sin, tri, saw, sqr or noi.", "MIX blends OSC1 into OSC2.",
      {"00 is OSC1 only, FF OSC2 only.", "80 gives about equal amounts.",
-      "DET 80 is in tune with OSC1.", "Lower DET flattens OSC2.",
-      "Higher DET sharpens OSC2.", "Range: about one semitone.", "SYNC only changes OSC1."}},
+      "DET 80 is in tune with OSC1.", "Range: about one semitone.", "SYNC only changes OSC1.",
+      "NOI makes fresh white noise.", "DET and SYNC do not tune noise."}},
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────

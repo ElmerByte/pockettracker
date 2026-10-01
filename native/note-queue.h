@@ -424,6 +424,7 @@ struct InstrumentParams {
     int loopEnd;        // 0-255 (normalized position); loop region top. 255 = sample end.
 
     bool synthEnabled = false;
+    int synthWave = 0;
     int synthWave2 = 0;
     float synthMix = 0.0f;
     float synthDetuneRatio = 1.0f;

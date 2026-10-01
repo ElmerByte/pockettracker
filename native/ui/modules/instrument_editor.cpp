@@ -163,11 +163,11 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     rowY += ROW_HEIGHT * 2;
     draw_section_source_row(c, x, rowY, nameX, s.cursorRow, s.cursorColumn, 5, t);
     rowY += ROW_HEIGHT * 2;
-    static const char* waves[] = {"sin", "tri", "saw", "sqr"};
-    draw_dual_row(c, rowY, nameX, valueX, "OSC1", waves[clamp(ins.synthWave, 0, 3)],
+    static const char* waves[] = {"sin", "tri", "saw", "sqr", "noi"};
+    draw_dual_row(c, rowY, nameX, valueX, "OSC1", waves[clamp(ins.synthWave, 0, 4)],
                   "SYNC", hex2(ins.synthSync), s.cursorRow, s.cursorColumn, 7, t);
     rowY += ROW_HEIGHT;
-    draw_dual_row(c, rowY, nameX, valueX, "OSC2", waves[clamp(ins.synthWave2, 0, 3)],
+    draw_dual_row(c, rowY, nameX, valueX, "OSC2", waves[clamp(ins.synthWave2, 0, 4)],
                   "DET", hex2(ins.synthDetune2), s.cursorRow, s.cursorColumn, 8, t);
     rowY += ROW_HEIGHT;
     draw_parameter_row(c, rowY, nameX, valueX, "MIX", hex2(ins.synthMix), false,
@@ -436,9 +436,9 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
 
     if (s.type() == InstrumentType::SYNTH && s.cursorRow >= 7) {
         const int row = s.cursorRow, col = s.cursorColumn;
-        if (row == 7 && col == 1) return cc::hex_byte(ins.synthWave, 0, 3);
+        if (row == 7 && col == 1) return cc::hex_byte(ins.synthWave, 0, 4);
         if (row == 7 && col == 3) return cc::hex_byte(ins.synthSync, 0, 255);
-        if (row == 8 && col == 1) return cc::hex_byte(ins.synthWave2, 0, 3);
+        if (row == 8 && col == 1) return cc::hex_byte(ins.synthWave2, 0, 4);
         if (row == 9 && col == 1) return cc::hex_byte(ins.synthMix, 0, 255, -1, false, false, false, 0);
         if (row == 8 && col == 3) return cc::hex_byte(ins.synthDetune2, 0, 255, -1, false, false, false, 128);
         if (row == 10) return cc::read_only();
@@ -652,9 +652,9 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
     const auto b255 = [&](int& field) { if (isSet) field = clamp(v, 0, 255); };
 
     if (ins.instrumentType == InstrumentType::SYNTH && row >= 7) {
-        if (row == 7 && col == 1 && isSet) ins.synthWave = clamp(v, 0, 3);
+        if (row == 7 && col == 1 && isSet) ins.synthWave = clamp(v, 0, 4);
         else if (row == 7 && col == 3) b255(ins.synthSync);
-        else if (row == 8 && col == 1 && isSet) ins.synthWave2 = clamp(v, 0, 3);
+        else if (row == 8 && col == 1 && isSet) ins.synthWave2 = clamp(v, 0, 4);
         else if (row == 9 && col == 1) b255(ins.synthMix);
         else if (row == 8 && col == 3) b255(ins.synthDetune2);
         else if (row == 11 && col == 1) {

@@ -870,6 +870,7 @@ void AudioEngine::setProgram(int instrumentId, const songcore::Program& program,
     if (program.sampleId >= 0 && program.sampleId < 256) {
         auto& params = instrumentParams.edit(program.sampleId);
         params.synthEnabled = program.type == songcore::PROGRAM_SYNTH;
+        params.synthWave = program.synthWave;
         params.synthWave2 = program.synthWave2;
         params.synthMix = program.synthMix;
         params.synthDetuneRatio = program.synthDetuneRatio;

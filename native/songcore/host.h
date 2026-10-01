@@ -517,7 +517,7 @@ class SongcoreHost {
         if (!engine_) return;
         if (id < 0 || id >= static_cast<int>(project_.instruments.size())) return;
         const Instrument& ins = project_.instruments[id];
-        const int shape = ins.synthWave | (ins.synthSync << 2);
+        const int shape = ins.synthWave | (ins.synthSync << 3);
         if (ins.instrumentType == InstrumentType::SYNTH && synthShapeCache_[id] != shape) {
             if (load_synth_wave(*engine_, ins)) synthShapeCache_[id] = shape;
         }

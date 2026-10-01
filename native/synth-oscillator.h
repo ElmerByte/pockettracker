@@ -2,10 +2,33 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include "rng.h"
 
 // Shared, read-only tables are built before playback; no allocation or initialization in the callback.
 namespace synth {
 inline constexpr int CYCLE = 1024;
+inline constexpr int NOISE = 4;
+
+struct Noise {
+    uint32_t state;
+    int remaining = 0;
+    float held = 0.0f;
+
+    void trigger(int track) {
+        state += 0x9e3779b9u * static_cast<uint32_t>(track + 1);
+        if (state == 0) state = 1;
+        remaining = 0;
+    }
+
+    float sample(int downsample) {
+        if (remaining <= 0) {
+            held = xorshift32Bipolar(state);
+            remaining = 1 << std::clamp(downsample, 0, 15);
+        }
+        --remaining;
+        return held;
+    }
+};
 inline const auto waves = [] {
     std::array<std::array<float, CYCLE + 1>, 4> result{};
     for (int i = 0; i <= CYCLE; ++i) {

@@ -73,7 +73,8 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     p.sfBank          = ins.sfBank;
     p.sfPreset        = ins.sfPreset;
     p.tableTicRate    = ins.tableTicRate;
-    p.synthWave2 = std::clamp(ins.synthWave2, 0, 3);
+    p.synthWave = std::clamp(ins.synthWave, 0, 4);
+    p.synthWave2 = std::clamp(ins.synthWave2, 0, 4);
     p.synthMix = std::clamp(ins.synthMix, 0, 255) / 255.0f;
     p.synthDetuneRatio = std::pow(2.0f, (std::clamp(ins.synthDetune2, 0, 255) - 128) / 1536.0f);
     p.slicingMode     = ins.instrumentType == InstrumentType::SYNTH ? 0 : ins.slicingMode;
