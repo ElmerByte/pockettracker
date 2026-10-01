@@ -633,6 +633,14 @@ tripling the volume. Pitch effects transpose the entire bank; intervals are
 chromatic offsets from the root, not independently snapped to the track scale.
 `off` preserves the original synth. These extra pitches are internal audio only;
 phrase columns and MIDI output are unchanged.
+Use **CHD in a phrase or table FX column** to select a shape for the sounding
+synth note: `00` off, `01` unison, `02` major, `03` minor, `04` sus4,
+`05` power, `06` the instrument's custom INT2/INT3. It works alongside a note
+or on a blank note row to change a held chord. Blank FX cells leave it alone;
+a new note returns to the instrument's CHD setting unless it also has CHD FX.
+The instrument's SPR and WIDTH still apply. CHD does not retrigger the envelope,
+is ignored by other instrument types, and cannot be ramped with AUS/AUF.
+
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.
@@ -2939,6 +2947,7 @@ Open with **A** on an EQ cell.
 | HPF | High-Pass On | `XX` | Switches a high-pass on for this note at cutoff `XX` |
 | BPF | Band-Pass On | `XX` | Switches a band-pass on for this note at centre `XX` |
 | DRV | Overdrive | `XX` | This note's overdrive, `00` clean to `FF` heavy |
+| CHD | Synth Chord | `00–06` | Off, unison, major, minor, sus4, power, custom; this note only, phrase or table |
 | CRU | Crush + Downsample | `XY` | `X` = bits crushed, `Y` = rate drop; both `0` = clean |
 | FIN | Fine Tune | `XX` | `80` in tune, a semitone either way; retunes a note already playing |
 | TSX | Transpose Multiplier | `XX` | How far TSP moves this note: `01` normal, `00` not at all, `FF` the other way. Phrase only |

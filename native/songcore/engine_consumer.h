@@ -49,6 +49,7 @@ static_assert(::FX_LPF    == FX_LPF,    "audio-defs.h FX_LPF has drifted from ef
 static_assert(::FX_HPF    == FX_HPF,    "audio-defs.h FX_HPF has drifted from effects.h");
 static_assert(::FX_BPF    == FX_BPF,    "audio-defs.h FX_BPF has drifted from effects.h");
 static_assert(::FX_DRV    == FX_DRV,    "audio-defs.h FX_DRV has drifted from effects.h");
+static_assert(::FX_CHD == FX_CHD, "CHD effect code has drifted");
 static_assert(::FX_CRU    == FX_CRU,    "audio-defs.h FX_CRU has drifted from effects.h");
 static_assert(::FX_FIN    == FX_FIN,    "audio-defs.h FX_FIN has drifted from effects.h");
 static_assert(::FX_LPO    == FX_LPO,    "audio-defs.h FX_LPO has drifted from effects.h");
@@ -89,7 +90,7 @@ constexpr bool table_arms_match_the_engine() {
             c != ::FX_CUT && c != ::FX_RES &&
             c != ::FX_LPF && c != ::FX_HPF && c != ::FX_BPF &&
             c != ::FX_DRV && c != ::FX_CRU && c != ::FX_FIN &&
-            c != ::FX_LPO && c != ::FX_TIM) return false;
+            c != ::FX_LPO && c != ::FX_TIM && c != ::FX_CHD) return false;
     }
     return table_automation::has_arm(::FX_HOP)    && table_automation::has_arm(::FX_TIC)  &&
            table_automation::has_arm(::FX_KILL)   && table_automation::has_arm(::FX_OFFSET) &&
@@ -100,7 +101,7 @@ constexpr bool table_arms_match_the_engine() {
            table_automation::has_arm(::FX_BPF)    &&
            table_automation::has_arm(::FX_DRV)    && table_automation::has_arm(::FX_CRU)  &&
            table_automation::has_arm(::FX_FIN)    && table_automation::has_arm(::FX_LPO) &&
-           table_automation::has_arm(::FX_TIM);
+           table_automation::has_arm(::FX_TIM) && table_automation::has_arm(::FX_CHD);
 }
 static_assert(table_arms_match_the_engine(),
               "table_automation.h's arm list and audio-defs.h's effect codes disagree — one of them "
@@ -189,6 +190,7 @@ class EngineConsumer : public IMidiConsumer {
             case CC_FILTER_HP:
             case CC_FILTER_BP:
             case CC_DRIVE:
+            case CC_SYNTH_CHORD:
             case CC_CRUSH:
             case CC_FINE_TUNE:
             case CC_LOOP_SLIDE:

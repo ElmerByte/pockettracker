@@ -82,11 +82,13 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     p.synthPulseWidth2 = std::clamp(ins.synthPulseWidth2, 0, 255);
     p.synthSync = std::clamp(ins.synthSync, 0, 255);
     p.synthChordEnabled = ins.synthChordMode > 0;
-    const auto intervals = synth_chord_intervals(ins);
-    const float spread = std::clamp(ins.synthChordDetune, 0, 255) / 255.0f * 0.25f;
+    p.synthChordInterval2 = std::clamp(ins.synthChordInterval2, -24, 24);
+    p.synthChordInterval3 = std::clamp(ins.synthChordInterval3, -24, 24);
+    p.synthChordDetune = std::clamp(ins.synthChordDetune, 0, 255);
+    p.synthChordRatio = synth::chordRatios(ins.synthChordMode, p.synthChordInterval2,
+                                         p.synthChordInterval3, p.synthChordDetune);
     const float width = std::clamp(ins.synthChordWidth, 0, 255) / 255.0f;
     for (int n = 0; n < 3; ++n) {
-        p.synthChordRatio[n] = std::pow(2.0f, (intervals[n] + (n - 1) * spread) / 12.0f);
         const float pan = 0.5f + (n - 1) * width * 0.5f;
         p.synthChordLeft[n] = std::cos(pan * 1.57079632679f) * 0.47140452079f;
         p.synthChordRight[n] = std::sin(pan * 1.57079632679f) * 0.47140452079f;

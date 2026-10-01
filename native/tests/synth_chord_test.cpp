@@ -7,18 +7,35 @@
 #include "songcore/engine_setup.h"
 #include "songcore/project_io.h"
 #include "songcore/synth_chord.h"
+#include "songcore/scheduler.h"
+#include "songcore/engine_consumer.h"
+#include "ui/fx_helper.h"
 #include "ui/modules/instrument_editor.h"
 #include "ui/instrument_row_layout.h"
 
-static std::vector<float> render(songcore::Instrument ins, float pitch = 220) {
+static std::vector<float> render(songcore::Instrument ins, float pitch = 220, int chordFx = -1, bool table = false, bool restart = false) {
     auto engine = std::make_unique<AudioEngine>();
     engine->setDeviceSampleRate(48000);
     ins.id = ins.sampleId = 0;
     assert(songcore::load_synth_wave(*engine, ins));
     songcore::Routing routing;
     songcore::push_instrument_params(*engine, ins, routing, 128, 48000);
-    engine->scheduleNote(0, 0, 0, pitch, 48000.0f / 1024, 0.5f);
-    engine->scheduleNoteOff(48000, 0);
+    if (table) {
+        uint8_t rows[16 * 8]{};
+        for (int row = 0; row < 16; ++row) rows[row * 8 + 1] = 255;
+        rows[2] = songcore::FX_CHD; rows[3] = static_cast<uint8_t>(chordFx);
+        engine->loadTable(0, rows);
+        // Hold this shape for the note; later blank rows do not erase it.
+    }
+    engine->scheduleNote(0, 0, 0, pitch, 48000.0f / 1024, 0.5f, 1.0f, 0.5f,
+                         -1, -1, table ? 0 : -1);
+    if (chordFx >= 0 && !table)
+        engine->scheduleVoiceCc(1, 0, songcore::CC_SYNTH_CHORD, chordFx / 255.0f);
+    if (restart) {
+        engine->scheduleVoiceCc(24000, 0, songcore::CC_SYNTH_CHORD, 3 / 255.0f);
+        engine->scheduleNote(48000, 0, 0, pitch, 48000.0f / 1024, 0.5f);
+    }
+    engine->scheduleNoteOff(restart ? 72000 : 48000, 0);
     std::vector<float> audio(96000 * 2);
     for (int frame = 0; frame < 96000; frame += 128)
         engine->processLiveBlock(audio.data() + frame * 2, 128, 2, 48000);
@@ -32,9 +49,8 @@ static std::vector<float> render(songcore::Instrument ins, float pitch = 220) {
     return audio;
 }
 
-static double amplitude(const std::vector<float>& audio, double hz, int channel = 0) {
+static double amplitude(const std::vector<float>& audio, double hz, int channel = 0, int first = 4800, int last = 38400) {
     double real = 0, imaginary = 0;
-    constexpr int first = 4800, last = 38400;
     for (int i = first; i < last; ++i) {
         const double phase = 6.283185307179586 * hz * i / 48000;
         real += audio[i * 2 + channel] * std::cos(phase);
@@ -42,6 +58,8 @@ static double amplitude(const std::vector<float>& audio, double hz, int channel 
     }
     return 2 * std::hypot(real, imaginary) / (last - first);
 }
+
+static uint32_t float_bits(float f) { uint32_t value; std::memcpy(&value, &f, sizeof(value)); return value; }
 
 int main() {
     using namespace songcore;
@@ -95,6 +113,55 @@ int main() {
         const auto text = serialize_instrument_preset(preset);
         assert(serialize_instrument_preset(parse_instrument_preset(json::parse(text))) == text);
     }
+    // CHD reaches the actual audio path from either a phrase controller or a table row.
+    auto fxIns = ins;
+    fxIns.synthChordMode = 0; fxIns.synthChordDetune = 0; fxIns.synthChordWidth = 0;
+    for (bool table : {false, true}) {
+        const auto audio = render(fxIns, 220, 3, table);
+        assert(amplitude(audio, 220 * std::pow(2.0, 3 / 12.0)) > 0.04);
+        assert(amplitude(audio, 220 * std::pow(2.0, 4 / 12.0)) < 0.01);
+    }
+    const auto changing = render(fxIns, 220, 2, false, true);
+    const double majThird = 220 * std::pow(2.0, 4 / 12.0);
+    const double minThird = 220 * std::pow(2.0, 3 / 12.0);
+    assert(amplitude(changing, majThird, 0, 4800, 22000) > 0.04);
+    assert(amplitude(changing, minThird, 0, 26000, 45000) > 0.04);
+    assert(amplitude(changing, minThird, 0, 52000, 68000) < 0.01);
+    assert(amplitude(changing, majThird, 0, 52000, 68000) < 0.01);
+    assert(amplitude(changing, 220, 0, 52000, 68000) > 0.1);
+    fxIns.synthChordMode = 2;
+    const auto offFx = render(fxIns, 220, 0);
+    assert(amplitude(offFx, 220) > 0.1);
+    assert(amplitude(offFx, 220 * std::pow(2.0, 4 / 12.0)) < 0.01);
+
+    struct Recorder : IMidiConsumer {
+        std::vector<Event> events;
+        void consume(const Event& event) override { events.push_back(event); }
+        void on_play(const std::string&, const std::string&, int64_t, int, int) override {}
+        void on_stop() override {}
+    } recorder;
+    auto fxProject = make_default_project();
+    fxProject.instruments[0] = fxIns;
+    auto& steps = fxProject.phrases[0].steps;
+    steps[0].note = Note{9, 3}; steps[0].instrument = 0;
+    steps[0].fx1Type = songcore::FX_CHD; steps[0].fx1Value = 2;
+    steps[1].fx1Type = songcore::FX_CHD; steps[1].fx1Value = 3;
+    MidiRouter router; router.add_consumer(&recorder);
+    Sequencer seq(router, fxProject, 48000); seq.playPhrase(0);
+    seq.updatePlaybackBuffer();
+    int64_t firstNote = -1;
+    bool sameStep = false, heldStep = false;
+    for (const auto& ev : recorder.events) {
+        if (ev.type == EV_NOTE_ON && firstNote < 0) firstNote = ev.frame;
+        if (ev.type == EV_CC && ev.cc.param == CC_SYNTH_CHORD) {
+            if (ev.cc.valueBits == float_bits(2 / 255.0f)) sameStep |= ev.frame == firstNote + 1;
+            if (ev.cc.valueBits == float_bits(3 / 255.0f)) heldStep |= ev.frame > firstNote + 1;
+        }
+    }
+    assert(sameStep && heldStep);
+    assert(effect_name(songcore::FX_CHD) == "CHD" && effect_value_max(songcore::FX_CHD) == 6);
+    assert(pt::ui::effect_descriptions()[effect_type_index(songcore::FX_CHD)][0] == "CHD: Synth chord shape");
+    assert(resolve_cc_param(fxIns, CC_SYNTH_CHORD) == -1); // Never sends a masked MIDI CC.
     assert(synth_chord_intervals(ins) == (std::array<int,3>{0,0,0}));
     auto project = make_default_project();
     const auto loaded = parse_project(json::parse(serialize_project(project)));

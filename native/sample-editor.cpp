@@ -878,6 +878,9 @@ void AudioEngine::setProgram(int instrumentId, const songcore::Program& program,
         params.synthPulseWidth2 = program.synthPulseWidth2;
         params.synthSync = program.synthSync;
         params.synthChordEnabled = program.synthChordEnabled;
+        params.synthChordInterval2 = program.synthChordInterval2;
+        params.synthChordInterval3 = program.synthChordInterval3;
+        params.synthChordDetune = program.synthChordDetune;
         params.synthChordRatio = program.synthChordRatio;
         params.synthChordLeft = program.synthChordLeft;
         params.synthChordRight = program.synthChordRight;

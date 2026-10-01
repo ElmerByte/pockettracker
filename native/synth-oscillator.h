@@ -9,6 +9,25 @@ namespace synth {
 inline constexpr int CYCLE = 1024;
 inline constexpr int NOISE = 4;
 
+inline std::array<int, 3> chordIntervals(int mode, int second, int third) {
+    switch (mode) {
+        case 1: return {0, 0, 0};
+        case 2: return {0, 4, 7};
+        case 3: return {0, 3, 7};
+        case 4: return {0, 5, 7};
+        case 5: return {0, 7, 12};
+        default: return {0, std::clamp(second, -24, 24), std::clamp(third, -24, 24)};
+    }
+}
+inline std::array<float, 3> chordRatios(int mode, int second, int third, int detune) {
+    const auto intervals = chordIntervals(mode, second, third);
+    const float spread = std::clamp(detune, 0, 255) / 255.0f * 0.25f;
+    std::array<float, 3> ratios;
+    for (int n = 0; n < 3; ++n)
+        ratios[n] = std::pow(2.0f, (intervals[n] + (n - 1) * spread) / 12.0f);
+    return ratios;
+}
+
 struct Noise {
     uint32_t state;
     int remaining = 0;

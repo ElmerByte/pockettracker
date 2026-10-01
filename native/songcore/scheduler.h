@@ -2053,6 +2053,8 @@ class Sequencer {
             // REPLACES. CRU's byte goes over whole; the engine splits the nibbles.
             if (params.driveValue.has_value())
                 router_.cc(voiceFxFrame, trackId, CC_DRIVE, *params.driveValue / 255.0f);
+            if (params.chordValue.has_value())
+                router_.cc(voiceFxFrame, trackId, CC_SYNTH_CHORD, *params.chordValue / 255.0f);
             if (params.crushValue.has_value())
                 router_.cc(voiceFxFrame, trackId, CC_CRUSH, *params.crushValue / 255.0f);
             // FIN — `voiceFxFrame` for the same reason, and here the +1 is what makes the command

@@ -433,6 +433,7 @@ bool AudioEngine::processTableRow(V& voice, const TableRow& row, int lane, bool 
             // tic. A table is where a dirt that rises while the note holds is actually written,
             // because it wants a value per tic rather than one per step.
             case FX_DRV: voiceSetDrive(voice, fxValue);     break;
+            case FX_CHD: voiceSetChord(voice, fxValue);   break;
             case FX_CRU: voiceSetCrush(voice, fxValue);     break;
 
             // FIN on a table row — a tuning per tic, which is where a chorus or a drifting detune is

@@ -69,6 +69,7 @@ inline constexpr Arm ARMS[] = {
     { 0x38, false, false },  // CRU — a packed pair, deliberately out of the registry (effects.h)
     { 0x39, true,  false },  // FIN
     { 0x3B, false, false },  // LPO — a relative STEP, so a ramp over it has nothing to interpolate
+    { 0x3E, false, false },  // CHD — discrete chord shape, not rampable
     { 0x3D, true,  false },  // TIM — the delay's echo time; a ramp over it is the tape swoop
 };
 inline constexpr int ARM_COUNT = static_cast<int>(sizeof(ARMS) / sizeof(Arm));

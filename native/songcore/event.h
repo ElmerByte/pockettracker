@@ -251,6 +251,7 @@ constexpr uint8_t CC_LOOP_SLIDE = 141;  // scheduleVoiceLoopSlide (authored byte
 // `resolve_cc_param` maps it to -1 and `midi_out.h` drops it for free.
 //
 // ⚠️ It may never reach a `& 0x7F` — 142 masks to CC 14 (undefined).
+constexpr uint8_t CC_SYNTH_CHORD = 143; // Engine-only: CHD shape, authored byte /255
 constexpr uint8_t CC_DELAY_TIME = 142;  // scheduleDelayTime (authored byte /255), TRACK_GLOBAL
 
 /** Slot index 0-3 for CC_SLOT_A..D, or -1 for a literal controller number. */

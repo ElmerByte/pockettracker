@@ -268,6 +268,9 @@ constexpr int FX_INS      = 0x3C;  // INS  play this note on instrument xx
 // ramp of them — is heard as a tape-style pitch bend in the repeats, not as a jump cut.
 constexpr int FX_TIM      = 0x3D;  // TIM  delay echo time, free scale (00-FF = 0-2 s), global
 
+// Per-note synth chord shape: 00 off, 01 uni, 02 maj, 03 min, 04 sus, 05 pwr, 06 custom.
+constexpr int FX_CHD = 0x3E;
+
 /** The instrument an INS cell on this step names, or -1. Rightmost wins, as in the scheduler. */
 inline int step_ins_instrument(const PhraseStep& s) {
     if (s.fx3Type == FX_INS) return s.fx3Value & 0xFF;
@@ -298,7 +301,7 @@ inline std::string effect_name(int code) {
         case FX_LPF: return "LPF"; case FX_HPF: return "HPF"; case FX_BPF: return "BPF";
         case FX_DRV: return "DRV"; case FX_CRU: return "CRU";
         case FX_FIN: return "FIN"; case FX_TSX: return "TSX"; case FX_LPO: return "LPO";
-        case FX_INS: return "INS"; case FX_TIM: return "TIM";
+        case FX_INS: return "INS"; case FX_TIM: return "TIM"; case FX_CHD: return "CHD";
         case FX_VTR: return "VTR"; case FX_VMV: return "VMV";
         case FX_SCA: return "SCA"; case FX_SCG: return "SCG";
         case FX_AUS: return "AUS"; case FX_AUF: return "AUF";
@@ -319,6 +322,7 @@ inline std::string effect_name(int code) {
 // SCA/SCG stop at 0xBF for the same kind of reason and a different arithmetic: their high nibble is a
 // KEY, and there are twelve of those, so 0xC0 and up name a key that does not exist.
 inline constexpr int effect_value_max(int effect_type) {
+    if (effect_type == FX_CHD) return 6;
     if (effect_type == FX_SCA || effect_type == FX_SCG) return 0xBF;
     return (effect_type == FX_TBL || effect_type == FX_GRV ||
             effect_type == FX_EQN || effect_type == FX_EQM ||
@@ -378,7 +382,7 @@ inline constexpr int EFFECT_TYPES[] = {
     // builds by trimming the tail, and INS must stay visible.
     FX_INS,
     // The delay's echo time. Above LPO for the reason INS is: the tail is what a release build trims.
-    FX_TIM,
+    FX_TIM, FX_CHD,
     // The loop-window slider, appended for the same reason.
     FX_LPO,
     // The MIDI commands (see the static_assert below — they must stay the LAST six)
@@ -468,6 +472,7 @@ struct ResolvedStepParams {
     std::optional<int> filterModeValue;   // LPF/HPF/BPF cutoff byte
     int filterModeType = 0;               // 1 lp | 2 hp | 3 bp; meaningless unless the above is set
     std::optional<int> driveValue;        // DRV
+    std::optional<int> chordValue;        // CHD — synth-only, per-note shape
     std::optional<int> crushValue;        // CRU — both nibbles still packed, split at the engine
     std::optional<int> fineTuneValue;     // FIN — authored byte, turned into semitones at the engine
     std::optional<int> tsxMultiplier;     // TSX — already decoded to a signed multiplier
@@ -536,6 +541,7 @@ inline ResolvedStepParams resolve_step_params(const PhraseStep& step,
                 break;
             case FX_DRV:    p.driveValue     = value; break;
             case FX_CRU:    p.crushValue     = value; break;
+            case FX_CHD:    p.chordValue     = std::max(0, std::min(6, value)); break;
             case FX_FIN:    p.fineTuneValue  = value; break;
             // Decoded here, the way PIT is, so the scheduler multiplies by a number rather than by
             // a byte it would have to remember to sign-extend.

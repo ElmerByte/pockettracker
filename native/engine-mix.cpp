@@ -951,7 +951,24 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
         const float detuneEnd = dualOsc ? detuneRatio(voice.modDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
         const float syncRatio = dualOsc ? 1.0f + 7.0f * synthParams->synthSync / 255.0f : 1.0f;
         const float mixStart = voice.synthMix;
-        const float chordTarget = dualOsc && synthParams->synthChordEnabled ? 1.0f : 0.0f;
+        const bool chordEnabled = voice.synthChordOverride < 0
+            ? dualOsc && synthParams->synthChordEnabled : voice.synthChordOverride > 0;
+        const float chordTarget = dualOsc && chordEnabled ? 1.0f : 0.0f;
+        const auto* chordRatio = dualOsc ? &synthParams->synthChordRatio : nullptr;
+        if (dualOsc && voice.synthChordOverride > 0) {
+            const uint32_t key = voice.synthChordOverride |
+                ((synthParams->synthChordInterval2 + 24) << 3) |
+                ((synthParams->synthChordInterval3 + 24) << 9) |
+                (synthParams->synthChordDetune << 15);
+            // Derive only when CHD or the instrument settings change, never per sample.
+            if (voice.synthChordKey != key) {
+                voice.synthChordOverrideRatio = synth::chordRatios(voice.synthChordOverride,
+                    synthParams->synthChordInterval2, synthParams->synthChordInterval3,
+                    synthParams->synthChordDetune);
+                voice.synthChordKey = key;
+            }
+            chordRatio = &voice.synthChordOverrideRatio;
+        }
         const float chordStart = voice.synthChordBlend;
         const bool renderChord = dualOsc && (chordTarget > 0.0f || chordStart > 0.0f);
         if (renderChord && chordStart == 0.0f) {
@@ -1084,7 +1101,7 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                             const float value = first * (1.0f - blend) + second * blend;
                             chordL += value * synthParams->synthChordLeft[n];
                             chordR += value * synthParams->synthChordRight[n];
-                            const double step = phaseStep * synthParams->synthChordRatio[n];
+                            const double step = phaseStep * (*chordRatio)[n];
                             synth::advance(voice.synthChordPhase1[n], step);
                             synth::advance(voice.synthChordPhase2[n], step * (detuneStart + (detuneEnd - detuneStart) * t));
                         }

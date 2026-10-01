@@ -95,6 +95,13 @@ static inline void voiceSetCrush(IAudioVoice& v, int packed) {
     v.params.setBase(PARAM_DOWNSAMPLE, (float)crushDownsampleOf(packed));
 }
 
+static inline void voiceSetChord(Voice& v, int mode) {
+    v.synthChordOverride = std::clamp(mode, 0, 6);
+}
+static inline void voiceSetChord(SoundfontVoice&, int) {}
+static inline void voiceResetChord(Voice& v) { v.synthChordOverride = -1; }
+static inline void voiceResetChord(SoundfontVoice&) {}
+
 // ─── REV / DEL — the send levels ─────────────────────────────────────────────────────────────────
 static inline void voiceSetSends(IAudioVoice& v, float rev, float dly) {
     v.reverbSend = rev;
@@ -121,6 +128,7 @@ static inline void voiceReloadInstrument(V& v, const InstrumentParams& ip, float
     voiceSetCrush(v, ((ip.crush & 0x0F) << 4) | (ip.downsample & 0x0F));
     voiceSetSends(v, ip.reverbSend, ip.delaySend);
     v.chorusSend = ip.chorusSend;
+    voiceResetChord(v);
 }
 
 // ─── FIN — the one command that lands in a bus slot the voices ALREADY reset ─────────────────────
@@ -167,6 +175,7 @@ static inline void applyVoiceCc(V& v, int cc, float value, float sampleRate) {
         case CC_DRIVE:       voiceSetDrive(v, byte); break;
         // ⚠️ The byte carries TWO nibbles, bits crushed high and downsample low — never interpolated.
         case CC_CRUSH:       voiceSetCrush(v, byte); break;
+        case CC_SYNTH_CHORD: voiceSetChord(v, byte); break;
         // Retunes a sounding note: 0x80 is in tune, the ends a semitone either way.
         case CC_FINE_TUNE:   voiceSetFineTune(v, byte); break;
         // ⚠️ ACCUMULATES — two records slide the window twice.
