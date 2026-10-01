@@ -12,6 +12,7 @@
 // out of reach of the engine, which is the one thing it is here to avoid.
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 #include "event.h"
@@ -59,7 +60,9 @@ struct Program {
     int32_t synthWave2 = 0;
     int32_t synthWave = 0;
     float synthMix = 0.0f;
-    float synthDetuneRatio = 1.0f;
+    int synthDetune2 = 128;
+    int synthPulseWidth1 = 128, synthPulseWidth2 = 128;
+    int synthSync = 0;
     int32_t slicingMode    = 0;       // 0 off, 1 CUT, 2 TRU
 
     const int64_t* sliceMarkers = nullptr;

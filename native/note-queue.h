@@ -427,7 +427,9 @@ struct InstrumentParams {
     int synthWave = 0;
     int synthWave2 = 0;
     float synthMix = 0.0f;
-    float synthDetuneRatio = 1.0f;
+    int synthDetune2 = 128;
+    int synthPulseWidth1 = 128, synthPulseWidth2 = 128;
+    int synthSync = 0;
 
     // Distortion/bitcrusher parameters
     int drive;          // 0-255 (pre-gain boost)

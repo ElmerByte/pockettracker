@@ -873,7 +873,10 @@ void AudioEngine::setProgram(int instrumentId, const songcore::Program& program,
         params.synthWave = program.synthWave;
         params.synthWave2 = program.synthWave2;
         params.synthMix = program.synthMix;
-        params.synthDetuneRatio = program.synthDetuneRatio;
+        params.synthDetune2 = program.synthDetune2;
+        params.synthPulseWidth1 = program.synthPulseWidth1;
+        params.synthPulseWidth2 = program.synthPulseWidth2;
+        params.synthSync = program.synthSync;
         instrumentParams.publish(program.sampleId);
     }
 }

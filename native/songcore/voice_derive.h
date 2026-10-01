@@ -76,7 +76,10 @@ inline Program make_program(const Instrument& ins, float sampleRateRatio, int sf
     p.synthWave = std::clamp(ins.synthWave, 0, 4);
     p.synthWave2 = std::clamp(ins.synthWave2, 0, 4);
     p.synthMix = std::clamp(ins.synthMix, 0, 255) / 255.0f;
-    p.synthDetuneRatio = std::pow(2.0f, (std::clamp(ins.synthDetune2, 0, 255) - 128) / 1536.0f);
+    p.synthDetune2 = std::clamp(ins.synthDetune2, 0, 255);
+    p.synthPulseWidth1 = std::clamp(ins.synthPulseWidth1, 0, 255);
+    p.synthPulseWidth2 = std::clamp(ins.synthPulseWidth2, 0, 255);
+    p.synthSync = std::clamp(ins.synthSync, 0, 255);
     p.slicingMode     = ins.instrumentType == InstrumentType::SYNTH ? 0 : ins.slicingMode;
     p.sliceMarkers    = (ins.instrumentType == InstrumentType::SYNTH || ins.sliceMarkers.empty()) ? nullptr : ins.sliceMarkers.data();
     p.sliceCount      = ins.instrumentType == InstrumentType::SYNTH ? 0 : static_cast<int32_t>(ins.sliceMarkers.size());
@@ -127,6 +130,10 @@ inline int mod_dest_code(ModDest dest) {
         case ModDest::MOD_AMT:       return 8;   // scales the NEXT slot's amount
         case ModDest::MOD_RATE:      return 9;   // scales the NEXT slot's time/freq
         case ModDest::MOD_BOTH:      return 10;
+        case ModDest::SYNTH_PW1: return 11;
+        case ModDest::SYNTH_PW2: return 12;
+        case ModDest::SYNTH_MIX: return 13;
+        case ModDest::SYNTH_DETUNE2: return 14;
         default:                     return 0;
     }
 }

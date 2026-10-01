@@ -83,7 +83,7 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
     // Step 6: Build routes array (user routes + 4 fixed sequencer routes).
     // Capacity: 4 user routes + 4 fixed sequencer routes = 8 total.
     // User routes are rebuilt each block because effectiveAmt changes with mod-to-mod.
-    // VOL (dest=1) and MOD_* (dest≥7) are excluded from user routes.
+    // VOL (dest=1), STA and MOD_* (dest=7..10) are excluded from user routes.
     ModRoute routes[8];
     int routeCount = 0;
 
@@ -91,7 +91,7 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
         const VoiceModSlot& mod = voice.voiceMods[m];
         if (mod.type == 0) continue;
         if (mod.dest == 0 || mod.dest == 1) continue;  // NONE or VOL (per-sample path)
-        if (mod.dest >= 7) continue;                    // STA / MOD_AMT / MOD_RATE / MOD_BOTH
+        if (mod.dest >= 7 && mod.dest <= 10) continue;                    // STA / MOD_AMT / MOD_RATE / MOD_BOTH
 
         ModSourceId srcId = (mod.type == 3 || mod.type == 6)
             ? (ModSourceId)(MOD_SRC_LFO0 + m)
@@ -104,6 +104,10 @@ inline void runModMatrix(IAudioVoice& voice, int numFrames, float sr) {
             case 4: destId = PARAM_PITCH;      scale = mod.effectiveAmt * 1.0f;   break;
             case 5: destId = PARAM_FILTER_CUT; scale = mod.effectiveAmt * 255.0f; break;
             case 6: destId = PARAM_FILTER_RES; scale = mod.effectiveAmt * 255.0f; break;
+            case 11: destId = PARAM_SYNTH_PW1; scale = mod.effectiveAmt * 128.0f; break;
+            case 12: destId = PARAM_SYNTH_PW2; scale = mod.effectiveAmt * 128.0f; break;
+            case 13: destId = PARAM_SYNTH_MIX; scale = mod.effectiveAmt * 255.0f; break;
+            case 14: destId = PARAM_SYNTH_DETUNE2; scale = mod.effectiveAmt * 128.0f; break;
             default: continue;
         }
         routes[routeCount++] = { srcId, destId, scale, MOD_SRC_NONE, 0.0f };

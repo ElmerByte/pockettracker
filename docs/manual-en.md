@@ -609,6 +609,16 @@ looped at the note pitch. Noise ignores DET and SYNC. For an airy pad, try OSC1
 `tri` or `saw`, OSC2 `noi`, MIX `10`–`20`, a low-pass filter, slow AMP attack and
 release, and a little chorus or reverb send. MIX `FF` gives pure OSC2 noise for
 hats and snares; the filter and envelopes shape it just like the pitched waves.
+**PW1 / PW2** set pulse width for the corresponding `sqr` oscillator. `80` is the
+normal 50% square; lower values narrow the pulse and higher values widen it,
+with duty limited to 5–95%. Other waveforms ignore pulse width.
+For PWM, open **MODS** with **R+UP**, use a free slot (usually MOD3 or MOD4), set
+TYPE to **LFO**, DEST to **PW1** or **PW2**, and choose AMT and FREQ. Try a triangle
+LFO, AMT `30`, and FREQ `08` for a slow moving pad. **MIX** and **DET2** are also
+synth modulation destinations: MIX adds to the blend, while DET2 moves OSC2's
+detune within its existing range. LFOs swing either way; envelopes move upward.
+These destinations are available for synth instruments. They are ignored by
+noise where they control pulse width or pitch.
 Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
 The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
 ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.

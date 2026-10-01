@@ -77,7 +77,8 @@ inline std::string default_table_name(int id)      { return "TBL"  + hex2(id); }
 enum class ModType { NONE, AHD, ADSR, LFO, DRUM, TRIG, TRACKING, SCALAR };
 enum class ModDest {
     NONE, VOLUME, PAN, PITCH, FINE_PITCH, FILTER_CUTOFF, FILTER_RES,
-    SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH
+    SAMPLE_START, MOD_AMT, MOD_RATE, MOD_BOTH,
+    SYNTH_PW1, SYNTH_PW2, SYNTH_MIX, SYNTH_DETUNE2
 };
 // The instrument's ROUTING DESTINATION — which sound module consumes its event stream (MIDI plan §1),
 // not "what kind of instrument it is". SAMPLER, SOUNDFONT and SYNTH are consumed by EngineConsumer;
@@ -122,6 +123,10 @@ inline const char* mod_dest_name(ModDest d) {
         case ModDest::MOD_AMT:       return "MOD_AMT";
         case ModDest::MOD_RATE:      return "MOD_RATE";
         case ModDest::MOD_BOTH:      return "MOD_BOTH";
+        case ModDest::SYNTH_PW1: return "SYNTH_PW1";
+        case ModDest::SYNTH_PW2: return "SYNTH_PW2";
+        case ModDest::SYNTH_MIX: return "SYNTH_MIX";
+        case ModDest::SYNTH_DETUNE2: return "SYNTH_DETUNE2";
     }
     return "NONE";
 }
@@ -137,6 +142,10 @@ inline bool mod_dest_from_name(const std::string& s, ModDest& out) {
     if (s == "MOD_AMT")       { out = ModDest::MOD_AMT;       return true; }
     if (s == "MOD_RATE")      { out = ModDest::MOD_RATE;      return true; }
     if (s == "MOD_BOTH")      { out = ModDest::MOD_BOTH;      return true; }
+    if (s == "SYNTH_PW1") { out = ModDest::SYNTH_PW1; return true; }
+    if (s == "SYNTH_PW2") { out = ModDest::SYNTH_PW2; return true; }
+    if (s == "SYNTH_MIX") { out = ModDest::SYNTH_MIX; return true; }
+    if (s == "SYNTH_DETUNE2") { out = ModDest::SYNTH_DETUNE2; return true; }
     return false;
 }
 inline const char* instrument_type_name(InstrumentType t) {
@@ -193,12 +202,16 @@ inline const char* mod_dest_display_name(ModDest d) {
         case ModDest::MOD_AMT:       return "MOD A";
         case ModDest::MOD_RATE:      return "MOD R";
         case ModDest::MOD_BOTH:      return "MOD B";
+        case ModDest::SYNTH_PW1: return "PW1";
+        case ModDest::SYNTH_PW2: return "PW2";
+        case ModDest::SYNTH_MIX: return "MIX";
+        case ModDest::SYNTH_DETUNE2: return "DET2";
     }
     return "---";
 }
 
 /** How many ModDest entries there are — the MODS screen's DEST cycle wraps on it. */
-inline constexpr int MOD_DEST_COUNT = 11;
+inline constexpr int MOD_DEST_COUNT = 15;
 
 // ─── leaf structs ───────────────────────────────────────────────────────────────────────────────
 
@@ -529,6 +542,7 @@ struct Instrument {
     InstrumentType instrumentType = InstrumentType::SAMPLER;
     int synthWave = 0; // 0 sine, 1 triangle, 2 saw, 3 square, 4 noise
     int synthWave2 = 0;
+    int synthPulseWidth1 = 128, synthPulseWidth2 = 128; // 80 = 50% duty; sqr only
     int synthMix = 0;       // 0 OSC1 only, 255 OSC2 only
     int synthDetune2 = 128; // 128 in tune; approximately -100..+100 cents
     int synthSync = 0; // 0 off; 1..255 hard-sync slave/master ratio (1..8)

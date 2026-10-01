@@ -941,8 +941,15 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
             ? &instrumentParams[voice.instrId] : nullptr;
         const bool dualOsc = synthParams && synthParams->synthEnabled;
         const float mixTarget = dualOsc ? synthParams->synthMix : 0.0f;
-        const double phaseStep = dualOsc ? std::abs(modulatedRate) * synthParams->synthDetuneRatio /
+        const double phaseStep = dualOsc ? std::abs(modulatedRate) /
             std::max(1, voice.actualLoopEnd - voice.actualLoopStart) : 0.0;
+        const auto detuneRatio = [&](float modulation) {
+            const float value = std::clamp(synthParams->synthDetune2 + modulation, 0.0f, 255.0f);
+            return std::pow(2.0f, (value - 128.0f) / 1536.0f);
+        };
+        const float detuneStart = dualOsc ? detuneRatio(voice.prevModDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
+        const float detuneEnd = dualOsc ? detuneRatio(voice.modDestValues[PARAM_SYNTH_DETUNE2]) : 1.0f;
+        const float syncRatio = dualOsc ? 1.0f + 7.0f * synthParams->synthSync / 255.0f : 1.0f;
         const float mixStart = voice.synthMix;
         for (int i = startFrame; i < to; i++) {
             int idx = (int)voice.position;
@@ -1030,17 +1037,29 @@ void AudioEngine::processAudioBlock(float* output, int numFrames, int channelCou
                 }
                 float processedSample = sample1 + (sample2 - sample1) * frac;
                 if (dualOsc) {
+                    const auto modulation = [&](ParamId parameter) {
+                        return voice.prevModDestValues[parameter] +
+                            (voice.modDestValues[parameter] - voice.prevModDestValues[parameter]) * t;
+                    };
+                    const float width1 = synthParams->synthPulseWidth1 + modulation(PARAM_SYNTH_PW1);
+                    const float width2 = synthParams->synthPulseWidth2 + modulation(PARAM_SYNTH_PW2);
                     if (synthParams->synthWave == synth::NOISE)
                         processedSample = voice.synthNoise1.sample(effDownsample);
-                    const float blend = mixStart + (mixTarget - mixStart) *
-                        static_cast<float>(i - startFrame + 1) / std::max(1, to - startFrame);
+                    else if (synthParams->synthWave == 3 && width1 != 128.0f)
+                        processedSample = synth::pulse(voice.position / synth::CYCLE * syncRatio,
+                                                       width1, effDownsample);
+                    const float blend = std::clamp(mixStart + (mixTarget - mixStart) *
+                        static_cast<float>(i - startFrame + 1) / std::max(1, to - startFrame) +
+                        modulation(PARAM_SYNTH_MIX) / 255.0f, 0.0f, 1.0f);
                     if (blend > 0.0f) {
                         const float second = synthParams->synthWave2 == synth::NOISE
                             ? voice.synthNoise2.sample(effDownsample)
+                            : synthParams->synthWave2 == 3
+                            ? synth::pulse(voice.synthPhase2, width2, effDownsample)
                             : synth::sample(synthParams->synthWave2, voice.synthPhase2, effDownsample);
                         processedSample = processedSample * (1.0f - blend) + second * blend;
                     }
-                    synth::advance(voice.synthPhase2, phaseStep);
+                    synth::advance(voice.synthPhase2, phaseStep * (detuneStart + (detuneEnd - detuneStart) * t));
                 }
                 voice.chain.filter.setInterpolatedCoeffs(t);
                 procL = procR = voice.chain.processMono(processedSample);

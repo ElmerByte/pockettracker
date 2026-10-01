@@ -393,6 +393,7 @@ enum class HelpTopic {
     SCREEN_INSTRUMENT_FX,
     INST_CHORUS_SEND,
     SYNTH_OSC2,
+    SYNTH_PULSE,
 
     COUNT
 };
@@ -2236,6 +2237,13 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
      {"00 is OSC1 only, FF OSC2 only.", "80 gives about equal amounts.",
       "DET 80 is in tune with OSC1.", "Range: about one semitone.", "SYNC only changes OSC1.",
       "NOI makes fresh white noise.", "DET and SYNC do not tune noise."}},
+    /* SYNTH_PULSE */
+    {"PW1 and PW2: pulse width", "Only affects sqr oscillators.", "80 is the usual square wave.",
+     {"Lower values narrow the pulse.", "Higher values widen it.",
+      "Duty is limited to 5-95 percent.", "R+UP opens the MODS screen.",
+      "Set an LFO DEST to PW1 or PW2.", "AMT controls the PWM depth.",
+      "MIX and DET2 can be modulated."}},
+
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────
@@ -2472,8 +2480,9 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
         case songcore::InstrumentType::SYNTH:
             if (row <= 3) return instrument_sample_topic(false, row, column);
             if (row == 8 || row == 9) return HelpTopic::SYNTH_OSC2;
-            if (row == 10) return HelpTopic::SCREEN_INSTRUMENT_FX;
-            if (row == 11) return HelpTopic::INST_EQ;
+            if (row == 10) return HelpTopic::SYNTH_PULSE;
+            if (row == 11) return HelpTopic::SCREEN_INSTRUMENT_FX;
+            if (row == 12) return HelpTopic::INST_EQ;
             return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }

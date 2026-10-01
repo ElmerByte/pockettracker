@@ -260,6 +260,8 @@ inline Instrument parse_instrument(const json& j, int index) {
     { auto it = j.find("instrumentType"); if (it != j.end() && it->is_string()) instrument_type_from_name(it->get<std::string>(), i.instrumentType); }
     i.synthWave = std::max(0, std::min(4, get_int(j, "synthWave", i.synthWave)));
     i.synthWave2 = std::clamp(get_int(j, "synthWave2", i.synthWave2), 0, 4);
+    i.synthPulseWidth1 = std::clamp(get_int(j, "synthPulseWidth1", i.synthPulseWidth1), 0, 255);
+    i.synthPulseWidth2 = std::clamp(get_int(j, "synthPulseWidth2", i.synthPulseWidth2), 0, 255);
     i.synthMix = std::clamp(get_int(j, "synthMix", i.synthMix), 0, 255);
     i.synthDetune2 = std::clamp(get_int(j, "synthDetune2", i.synthDetune2), 0, 255);
     i.synthSync = std::max(0, std::min(255, get_int(j, "synthSync", i.synthSync)));
@@ -746,6 +748,8 @@ inline void emit_instrument(JsonWriter& w, const Instrument& i) {
     if (i.instrumentType != InstrumentType::SAMPLER) w.field_string("instrumentType", instrument_type_name(i.instrumentType));
     if (i.synthWave != 0) w.field_int("synthWave", i.synthWave);
     if (i.synthWave2 != 0) w.field_int("synthWave2", i.synthWave2);
+    if (i.synthPulseWidth1 != 128) w.field_int("synthPulseWidth1", i.synthPulseWidth1);
+    if (i.synthPulseWidth2 != 128) w.field_int("synthPulseWidth2", i.synthPulseWidth2);
     if (i.synthMix != 0) w.field_int("synthMix", i.synthMix);
     if (i.synthDetune2 != 128) w.field_int("synthDetune2", i.synthDetune2);
     if (i.synthSync != 0) w.field_int("synthSync", i.synthSync);

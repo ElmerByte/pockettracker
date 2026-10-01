@@ -34,7 +34,11 @@ enum ParamId {
     PARAM_SAMPLE_START = 8,  // Sample start point: 0–255 normalized
     PARAM_SAMPLE_END   = 9,  // Sample end point: 0–255 normalized
     PARAM_LOOP_START   = 10, // Loop start point: 0–255 normalized
-    PARAM_COUNT        = 11
+    PARAM_SYNTH_PW1    = 11, // Pulse width byte, 80 = 50%
+    PARAM_SYNTH_PW2    = 12,
+    PARAM_SYNTH_MIX    = 13, // Oscillator blend byte
+    PARAM_SYNTH_DETUNE2 = 14, // OSC2 detune byte, 80 = center
+    PARAM_COUNT        = 15
 };
 
 struct ParamBus {
@@ -53,6 +57,9 @@ struct ParamBus {
         base[PARAM_SAMPLE_START] = 0.0f;
         base[PARAM_SAMPLE_END]   = 255.0f;
         base[PARAM_LOOP_START]   = 0.0f;
+        base[PARAM_SYNTH_PW1] = base[PARAM_SYNTH_PW2] = 128.0f;
+        base[PARAM_SYNTH_MIX] = 0.0f;
+        base[PARAM_SYNTH_DETUNE2] = 128.0f;
         memset(mod, 0, sizeof(mod));
     }
 

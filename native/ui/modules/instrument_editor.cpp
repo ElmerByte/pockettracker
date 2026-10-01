@@ -173,9 +173,12 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     draw_parameter_row(c, rowY, nameX, valueX, "MIX", hex2(ins.synthMix), false,
                        s.cursorRow == 9, t);
     rowY += ROW_HEIGHT;
-    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 10, t);
+    draw_dual_row(c, rowY, nameX, valueX, "PW1", hex2(ins.synthPulseWidth1),
+                  "PW2", hex2(ins.synthPulseWidth2), s.cursorRow, s.cursorColumn, 10, t);
     rowY += ROW_HEIGHT;
-    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 11, t);
+    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 11, t);
+    rowY += ROW_HEIGHT;
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 12, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -441,8 +444,11 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
         if (row == 8 && col == 1) return cc::hex_byte(ins.synthWave2, 0, 4);
         if (row == 9 && col == 1) return cc::hex_byte(ins.synthMix, 0, 255, -1, false, false, false, 0);
         if (row == 8 && col == 3) return cc::hex_byte(ins.synthDetune2, 0, 255, -1, false, false, false, 128);
-        if (row == 10) return cc::read_only();
-        if (row == 11 && col == 1)
+        if (row == 10 && (col == 1 || col == 3))
+            return cc::hex_byte(col == 1 ? ins.synthPulseWidth1 : ins.synthPulseWidth2,
+                                0, 255, -1, false, false, false, 128);
+        if (row == 11) return cc::read_only();
+        if (row == 12 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
         return cc::none();
@@ -657,7 +663,9 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
         else if (row == 8 && col == 1 && isSet) ins.synthWave2 = clamp(v, 0, 4);
         else if (row == 9 && col == 1) b255(ins.synthMix);
         else if (row == 8 && col == 3) b255(ins.synthDetune2);
-        else if (row == 11 && col == 1) {
+        else if (row == 10 && col == 1) b255(ins.synthPulseWidth1);
+        else if (row == 10 && col == 3) b255(ins.synthPulseWidth2);
+        else if (row == 12 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;

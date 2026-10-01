@@ -52,6 +52,21 @@ inline float sample(int wave, double phase, int downsample = 0) {
     return table[index] + (table[index + 1] - table[index]) * static_cast<float>(position - index);
 }
 
+// Same interpolation as the square table at width 80. Limit duty to 5..95% so PWM
+// never collapses into a constant signal at either end of a modulation sweep.
+inline float pulse(double phase, float widthByte, int downsample = 0) {
+    phase -= std::floor(phase);
+    const double position = phase * CYCLE;
+    const int index = std::min(CYCLE - 1, static_cast<int>(position));
+    const float edge = std::clamp(widthByte / 256.0f, 0.05f, 0.95f) * CYCLE;
+    const auto at = [edge](int i) { return (i % CYCLE) < edge ? 1.0f : -1.0f; };
+    if (downsample > 0) {
+        const int factor = 1 << std::clamp(downsample, 0, 15);
+        return at((index / factor) * factor);
+    }
+    return at(index) + (at(index + 1) - at(index)) * static_cast<float>(position - index);
+}
+
 inline void advance(double& phase, double step) {
     phase += step;
     if (phase >= 1.0) phase -= std::floor(phase);

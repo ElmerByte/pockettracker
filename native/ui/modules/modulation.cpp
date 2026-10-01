@@ -175,7 +175,9 @@ CursorContext ModulationModule::cursor_context(const ModulationState& s) const {
 
         case 1:  // DEST — nothing to route until there is a type to route
             if (slot.type == ModType::NONE) return cc::read_only();
-            return cc::index_cycle(static_cast<int>(slot.dest), songcore::MOD_DEST_COUNT);
+            return cc::index_cycle(static_cast<int>(slot.dest),
+                s.instrument.instrumentType == songcore::InstrumentType::SYNTH ? songcore::MOD_DEST_COUNT
+                : static_cast<int>(ModDest::SYNTH_PW1));
 
         case 2:  // AMT
             if (slot.type == ModType::NONE) return cc::read_only();
@@ -257,7 +259,9 @@ ModulationInputResult ModulationModule::handle_input(Instrument& ins, int slot_i
         }
         case 1:
             if (slot.type != ModType::NONE)
-                slot.dest = static_cast<ModDest>(clamp(v, 0, songcore::MOD_DEST_COUNT - 1));
+                slot.dest = static_cast<ModDest>(clamp(v, 0,
+                    ins.instrumentType == songcore::InstrumentType::SYNTH ? songcore::MOD_DEST_COUNT - 1
+                    : static_cast<int>(ModDest::SYNTH_PW1) - 1));
             break;
         case 2:
             if (slot.type != ModType::NONE) slot.amount = clamp(v, 0, 255);
