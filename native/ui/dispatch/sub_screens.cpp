@@ -147,6 +147,12 @@ bool InputDispatcher::instrument_open_at_cursor() {
     const int         row  = s_.instrumentCursorRow;
     const int         col  = s_.instrumentCursorColumn;
 
+    if (row == instrument_fx_row(ins.instrumentType) && col == 1) {
+        s_.instrumentFxCursor = 0;
+        s_.currentScreen = ScreenType::INSTRUMENT_FX;
+        return true;
+    }
+
     // Row 0 — TYPE (col 1), LOAD or synth AMP (col 2), and sampler EDIT or synth FILT (col 3).
     // The instrument PRESET save/load lives on row 5.
     //
@@ -193,7 +199,7 @@ bool InputDispatcher::instrument_open_at_cursor() {
         return true;
     }
 
-    // ⚠️ Row 1 (NAME) and row 12/14 col 1 (the EQ cell) are NOT here — they are the two DEFERRED cells,
+    // ⚠️ Row 1 (NAME) and the EQ row col 1 are NOT here — they are the two DEFERRED cells,
     // and they live in `open_sub_screen_at_cursor` with the other four. That split is Kotlin's, and it
     // is the difference between a cell whose A fires on the PRESS (these — read-only buttons with no
     // A+DPAD to protect) and one whose A must wait for the RELEASE.

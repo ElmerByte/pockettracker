@@ -466,6 +466,7 @@ add_library(pt-ui STATIC
         ui/modules/help_overlay.cpp
         ui/modules/help_panel.cpp
         ui/modules/instrument_editor.cpp
+        ui/modules/instrument_fx_editor.cpp
         ui/modules/instrument_pool.cpp
         ui/modules/loading_strip.cpp
         ui/modules/midi_map_editor.cpp

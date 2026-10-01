@@ -87,6 +87,7 @@ void InputDispatcher::on_button_a() {
     if (eq_open()) return;
 
     if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) return;
+    if (s_.currentScreen == ScreenType::INSTRUMENT_FX) return;
 
     // A on a cell that OPENS a sub-screen — the two NAME rows and all five EQ cells. Runs BEFORE the
     // per-screen arms below, exactly as Kotlin's `openSubScreenAtCursor(peek = false)` does, because
@@ -233,7 +234,7 @@ void InputDispatcher::on_button_b() {
     // would land on the mixer behind it.
     if (eq_open()) { close_eq_editor(); return; }
 
-    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR) {
+    if (s_.currentScreen == ScreenType::ENVELOPE_EDITOR || s_.currentScreen == ScreenType::INSTRUMENT_FX) {
         s_.currentScreen = ScreenType::INSTRUMENT;
         return;
     }

@@ -113,6 +113,7 @@ struct AppState {
     int instrumentCursorColumn = 1;
     int envelopeCursor = 0; // ATK, DEC, SUS, REL, AMT
     int envelopeSlot = 0;   // 0 = synth volume, 1 = synth filter cutoff
+    int instrumentFxCursor = 0;
 
     /** INST.POOL. The pool's ROW is `currentInstrument` itself, so only the column lives here (0..4). */
     int poolCursorColumn = 0;
@@ -681,6 +682,7 @@ inline bool modal_backdrop_active(const AppState& s) {
 inline bool full_screen_module(const AppState& s) {
     return s.currentScreen == ScreenType::FILE_BROWSER ||
            s.currentScreen == ScreenType::ENVELOPE_EDITOR ||
+           s.currentScreen == ScreenType::INSTRUMENT_FX ||
            (s.currentScreen == ScreenType::SAMPLE_EDITOR && !s.eq.isOpen);
 }
 

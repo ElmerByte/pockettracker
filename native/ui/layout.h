@@ -36,6 +36,7 @@
 #include "ui/modules/help_overlay.h"
 #include "ui/modules/help_panel.h"
 #include "ui/modules/instrument_editor.h"
+#include "ui/modules/instrument_fx_editor.h"
 #include "ui/modules/instrument_pool.h"
 #include "ui/modules/loading_strip.h"
 #include "ui/modules/midi_map_editor.h"
@@ -180,6 +181,7 @@ private:
     FileBrowserModule     fileBrowser_;   // full-screen: draw() returns before the furniture
     SampleEditorModule    sampleEditor_;  // full-screen too — a waveform wants the width
     EnvelopeEditorModule  envelopeEditor_;
+    InstrumentFxEditorModule instrumentFxEditor_;
     QwertyKeyboardOverlay qwerty_;        // modal: drawn LAST, over everything, including the browser
     EqModule              eq_;            // stateful (curve cache); drawn INSTEAD of the screen module
     ThemeEditorModule     themeEditor_;   // drawn INSTEAD of the screen module, on the EQ's terms (S9)

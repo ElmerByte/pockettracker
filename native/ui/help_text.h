@@ -390,6 +390,8 @@ enum class HelpTopic {
     GROOVE_LOAD,
     GROOVE_QNT,
     GROOVE_SWG,
+    SCREEN_INSTRUMENT_FX,
+    INST_CHORUS_SEND,
 
     COUNT
 };
@@ -2213,6 +2215,21 @@ inline constexpr HelpEntry HELP_ENTRIES[] = {
       "not this panel, so setting QNT",
       "does not move it."},
      {"Nothing - it only reports"}},
+    /* SCREEN_INSTRUMENT_FX */
+    {"FX: this instrument", "Drive, crush, downsample, filter", "and sends for this sound only.",
+     {"The settings belong to the",
+      "selected instrument. Samplers,",
+      "SoundFonts and synths share",
+      "these controls. Delay, reverb",
+      "and chorus settings are on the",
+      "shared EFFECTS screen."},
+     {"UP/DOWN picks a parameter",
+      "A+D-PAD changes its value",
+      "A+B resets the value",
+      "START auditions the instrument",
+      "B goes back to INSTRUMENT"}},
+    /* INST_CHORUS_SEND */
+    {"CHO: chorus send", "How much of this instrument", "feeds the shared chorus."},
 };
 
 // ─── The compile-time check on the table ─────────────────────────────────────────────────────────
@@ -2336,6 +2353,7 @@ inline HelpTopic help_screen_topic(ScreenType screen) {
         case ScreenType::SETTINGS:      return HelpTopic::SCREEN_SETTINGS;
         case ScreenType::SAMPLE_EDITOR: return HelpTopic::SCREEN_SAMPLE_EDITOR;
         case ScreenType::ENVELOPE_EDITOR: return HelpTopic::SCREEN_MODS;
+        case ScreenType::INSTRUMENT_FX: return HelpTopic::SCREEN_INSTRUMENT_FX;
         case ScreenType::MIDI:          return HelpTopic::SCREEN_MIDI;
         case ScreenType::MIDI_MAP:      return HelpTopic::SCREEN_MIDI_MAP;
     }
@@ -2413,24 +2431,13 @@ inline HelpTopic instrument_sample_topic(bool sf, int row, int column) {
     }
     if (sf && row == 6) return column == 1 ? HelpTopic::INST_PATCH : HelpTopic::NONE;
 
-    if (row == 7 + off) return column == 1 ? HelpTopic::INST_DRIVE : HelpTopic::INST_FILTER;
-    if (row == 8 + off) return column == 1 ? HelpTopic::INST_CRUSH : HelpTopic::INST_FILTER_FREQ;
-    if (row == 9 + off) return column == 1 ? HelpTopic::INST_DOWNSAMPLE : HelpTopic::INST_FILTER_RES;
-
-    if (sf) {
-        // The SoundFont tail is one parameter per row, so any column but the label is the value.
-        if (row == 12) return HelpTopic::INST_REVERB_SEND;
-        if (row == 13) return HelpTopic::INST_DELAY_SEND;
-        if (row == 14) return HelpTopic::INST_EQ;
-        return HelpTopic::NONE;
-    }
-
+    if (row == 7 + off) return HelpTopic::SCREEN_INSTRUMENT_FX;
+    if (sf) return row == 9 ? HelpTopic::INST_EQ : HelpTopic::NONE;
     switch (row) {
-        case 11: return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
-        case 12: return column == 1 ? HelpTopic::INST_EQ : HelpTopic::INST_SLICE;
-        case 13: return column == 1 ? HelpTopic::INST_LOOP_MODE : HelpTopic::INST_SAMPLE_START;
-        case 14: return column == 1 ? HelpTopic::INST_LOOP_START : HelpTopic::INST_SAMPLE_END;
-        case 15: return column == 1 ? HelpTopic::INST_LOOP_END : HelpTopic::INST_REVERSE;
+        case 8: return column == 1 ? HelpTopic::INST_EQ : HelpTopic::INST_SLICE;
+        case 9: return column == 1 ? HelpTopic::INST_LOOP_MODE : HelpTopic::INST_SAMPLE_START;
+        case 10: return column == 1 ? HelpTopic::INST_LOOP_START : HelpTopic::INST_SAMPLE_END;
+        case 11: return column == 1 ? HelpTopic::INST_LOOP_END : HelpTopic::INST_REVERSE;
         default: return HelpTopic::NONE;
     }
 }
@@ -2458,11 +2465,8 @@ inline HelpTopic instrument_topic(songcore::InstrumentType type, int row, int co
         case songcore::InstrumentType::SOUNDFONT: return instrument_sample_topic(true, row, column);
         case songcore::InstrumentType::SYNTH:
             if (row <= 3) return instrument_sample_topic(false, row, column);
-            if (row == 7) return column == 3 ? HelpTopic::INST_FILTER : HelpTopic::NONE;
-            if (row == 8) return column == 1 ? HelpTopic::INST_FILTER_FREQ : HelpTopic::INST_FILTER_RES;
-            if (row == 9) return column == 1 ? HelpTopic::INST_REVERB_SEND : HelpTopic::INST_DELAY_SEND;
-            if (row == 10) return HelpTopic::INST_EQ;
-            if (row == 11 && column == 1) return HelpTopic::INST_DRIVE;
+            if (row == 8) return HelpTopic::SCREEN_INSTRUMENT_FX;
+            if (row == 9) return HelpTopic::INST_EQ;
             return HelpTopic::NONE;
         default:                                  return instrument_sample_topic(false, row, column);
     }
@@ -2840,6 +2844,15 @@ inline HelpTopic help_topic(const AppState& s) {
                                                 s.instrumentCursorColumn);
             }
             break;
+        case ScreenType::INSTRUMENT_FX: {
+            const HelpTopic topics[] = {HelpTopic::INST_DRIVE, HelpTopic::INST_CRUSH,
+                HelpTopic::INST_DOWNSAMPLE, HelpTopic::INST_FILTER, HelpTopic::INST_FILTER_FREQ,
+                HelpTopic::INST_FILTER_RES, HelpTopic::INST_REVERB_SEND,
+                HelpTopic::INST_DELAY_SEND, HelpTopic::INST_CHORUS_SEND};
+            if (s.instrumentFxCursor >= 0 && s.instrumentFxCursor < 9)
+                cell = topics[s.instrumentFxCursor];
+            break;
+        }
         case ScreenType::PROJECT:
             cell = detail::project_cell_topic(s.projectCursorRow, s.projectCursorColumn);
             break;

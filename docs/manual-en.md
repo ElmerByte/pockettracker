@@ -596,7 +596,34 @@ Navigate here with **R+RIGHT** from PHRASE. Use **B+LEFT/RIGHT** to switch betwe
 
 ### Built-in synth
 
-On the **TYPE** cell, hold **A** and press LEFT/RIGHT until it reads **synth**. No sound file is needed: press **START** to audition the instrument, or use it in a phrase. **WAVE** selects sine, triangle, saw, or square. The same ROOT, DETUNE, VOL, PAN, filter, sends, and EQ controls used by other instruments apply here. **ATK** (Attack), **DEC** (Decay), **SUS** (Sustain), and **REL** (Release) control the synth's volume envelope directly. ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level (`00` silent, `FF` full). These are the same values as the volume ADSR in MOD1. If MOD1 was changed to another type or destination, editing one of these cells restores it as the synth's volume ADSR. Open **MODS** with **R+UP** to edit the envelope further or add an LFO to pitch, volume, pan, or filter. A note-off starts the release; a hard kill cuts the note. High saw and square notes may sound bright or alias because this first version uses a single wavetable per waveform.
+On the **TYPE** cell, hold **A** and press LEFT/RIGHT until it reads **synth**.
+No sound file is needed: press **START** to audition, or use it in a phrase.
+**WAVE** selects `sin`, `tri`, `saw`, or `sqr`; **SYNC** sets oscillator hard sync.
+Open **AMP** to edit the volume ADSR and **FILT** to edit the filter envelope.
+The envelopes use ATK, DEC, SUS, and REL: attack, decay, sustain, and release.
+ATK, DEC, and REL are `00`–`FF` durations in sequencer ticks; SUS is the held level.
+These editors use the first two modulation slots. Open **MODS** with **R+UP** to
+add or change modulation. A note-off starts release; a hard kill cuts the note.
+The **FX** editor provides drive, crush, downsample, filter, and effect sends.
+High saw and square notes may alias because the synth uses a single wavetable per waveform.
+
+### Instrument FX editor
+
+Press **A** on **FX → EDIT >** to edit the selected sampler, SoundFont, or synth's effects.
+Use **UP/DOWN** to choose a control, **A + D-pad** to change it, **A+B** to reset it,
+**START** to audition, and **B** to return.
+
+| Control | Range | Description |
+|---|---|---|
+| DRIVE | 00–FF | Soft-clipping overdrive; `00` is off. |
+| CRUSH | 0–F | Bit-depth reduction; `0` is off. |
+| DOWNSAMPLE | 0–F | Sample-rate reduction; `0` is off. |
+| FILTER | off / lp / hp / bp | Resonant filter type. |
+| CUTOFF / RESONANCE | 00–FF | Filter frequency and resonance. |
+| REVERB / DELAY / CHORUS SEND | 00–FF | Amount of this instrument sent to each shared effect. |
+
+These values belong to the selected instrument. The **EFFECTS** screen still sets
+shared reverb, delay, and chorus behavior. External MIDI instruments have no FX editor.
 
 ### WAV instrument parameters
 
@@ -616,18 +643,14 @@ On the **TYPE** cell, hold **A** and press LEFT/RIGHT until it reads **synth**. 
 | LOOP END | 00–FF | Loop end point. `FF` = sample end. Loop region is [LOOP ST, LOOP END] — see below. |
 | REVERSE | OFF / ON | Reverse playback. |
 | SLICE | OFF / CUT / TRU | Slice playback mode (see below). |
-| FILTER | LP / HP / BP / OFF | Resonant SVF filter type. |
-| CUT | 00–FF | Filter cutoff frequency. `FF` = open. |
-| RES | 00–FF | Filter resonance. `00` = none. |
-| DRIVE | 00–FF | Soft-clipping overdrive. `00` = off. |
-| CRUSH | 00–FF | Bit-depth crusher. `00` = off. |
+| FX | — | Press A on EDIT > to open the instrument FX editor. |
 | EQ | — | Press A to open the EQ EDITOR for this instrument. A + LEFT/RIGHT picks the EQ slot. |
 
 > [!TIP]
 > **ROOT** is the most important tuning parameter. Set it to the actual pitch of your sample (e.g., `A-4` for a 440 Hz sine). If notes sound in the wrong octave, ROOT is usually the reason.
 
 > [!TIP]
-> **DRIVE** and **CRUSH** are subtle at low values (`10`–`30`) and very aggressive near `FF`. Both are per-instrument — start low and increase by ear.
+> **DRIVE** and **CRUSH** are per-instrument — start low and increase by ear in the FX editor.
 
 ### SF2 instrument parameters
 
@@ -1355,7 +1378,7 @@ The delay return volume is set on the MIXER screen (DEL row in master column).
 | FX | Select master bus effect: OTT (3-band compressor) or DUST (lo-fi chain). |
 | DEPTH | Wet/dry depth of the selected effect (`00` = bypass, `FF` = full). |
 
-Per-instrument effects (filter, drive, crush) are set on the INSTRUMENT screen.
+Per-instrument effects and sends are set in **INSTRUMENT → FX → EDIT >**.
 
 ---
 

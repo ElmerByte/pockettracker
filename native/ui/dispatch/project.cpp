@@ -128,6 +128,7 @@ void InputDispatcher::reset_editing_context() {
     s_.cursorRow = 0; s_.cursorColumn = 1;
     s_.songScrollPosition = 0;
     s_.instrumentCursorRow = 0; s_.instrumentCursorColumn = 1;
+    s_.instrumentFxCursor = 0;
     // ⚠️ BOTH halves of the mixer cursor, and the row is not optional. Resetting the column alone left
     // the pair at (OTT, track 0) or (LIM, track 0) — rows that exist only in the master strip, over a
     // column that has no such row. Nothing draws highlighted there and no edit dispatches: load a

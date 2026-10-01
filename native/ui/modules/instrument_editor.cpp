@@ -117,48 +117,14 @@ void InstrumentEditorModule::draw(Canvas& c, int x, int y, const InstrumentEdito
     // ── 6/7: spacer ──────────────────────────────────────────────────────────────────────────────
     rowY += ROW_HEIGHT; currentRow++;
 
-    // ── The DSP block: DRIVE+FILTER, CRUSH+FREQ, DWNSMPL+RES ─────────────────────────────────────
-    draw_dual_row(c, rowY, nameX, valueX, "DRIVE", hex2(ins.drive), "FILTER", ins.filterType,
-                  s.cursorRow, s.cursorColumn, currentRow, t);
+    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >",
+                       false, s.cursorRow == currentRow, t);
     rowY += ROW_HEIGHT; currentRow++;
-
-    draw_dual_row(c, rowY, nameX, valueX, "CRUSH", hex1(ins.crush), "FREQ", hex2(ins.filterCut),
-                  s.cursorRow, s.cursorColumn, currentRow, t);
-    rowY += ROW_HEIGHT; currentRow++;
-
-    draw_dual_row(c, rowY, nameX, valueX, "DWNSMPL", hex1(ins.downsample), "RES",
-                  hex2(ins.filterRes), s.cursorRow, s.cursorColumn, currentRow, t);
-    rowY += ROW_HEIGHT; currentRow++;
-
-    // ── spacer ───────────────────────────────────────────────────────────────────────────────────
-    rowY += ROW_HEIGHT; currentRow++;
-
-    // ── The type-specific tail ───────────────────────────────────────────────────────────────────
-    if (sf) {
-        // The SoundFont has no sample window and no loop, so its sends get a row each and the screen
-        // ends at EQ.
-        const auto on = [&](int col) { return s.cursorRow == currentRow && s.cursorColumn == col; };
-
-        draw_parameter_row(c, rowY, nameX, valueX, "REV", hex2(ins.reverbSend), on(0), on(1), t);
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot,
+                sf ? "" : "SLICE", sf ? "" : slice_modes()[static_cast<size_t>(clamp(ins.slicingMode, 0, 2))],
+                s.cursorRow, s.cursorColumn, currentRow, t);
+    if (!sf) {
         rowY += ROW_HEIGHT; currentRow++;
-
-        draw_parameter_row(c, rowY, nameX, valueX, "DEL", hex2(ins.delaySend), on(0), on(1), t);
-        rowY += ROW_HEIGHT; currentRow++;
-
-        draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "CHO", hex2(ins.chorusSend), s.cursorRow,
-                    s.cursorColumn, currentRow, t);
-
-    } else {
-        draw_triple_row(c, x, rowY, nameX, "REV", hex2(ins.reverbSend), "DEL",
-                        hex2(ins.delaySend), "CHO", hex2(ins.chorusSend),
-                        s.cursorRow, s.cursorColumn, currentRow, t);
-        rowY += ROW_HEIGHT; currentRow++;
-
-        draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot,
-                    "SLICE", slice_modes()[static_cast<size_t>(clamp(ins.slicingMode, 0, 2))],
-                    s.cursorRow, s.cursorColumn, currentRow, t);
-        rowY += ROW_HEIGHT; currentRow++;
-
         draw_dual_row(c, rowY, nameX, valueX, "LOOP", ins.loopMode, "START", hex2(ins.sampleStart),
                       s.cursorRow, s.cursorColumn, currentRow, t);
         rowY += ROW_HEIGHT; currentRow++;
@@ -199,19 +165,11 @@ void InstrumentEditorModule::draw_synth(Canvas& c, int x, int y,
     rowY += ROW_HEIGHT * 2;
     static const char* waves[] = {"sin", "tri", "saw", "sqr"};
     draw_dual_row(c, rowY, nameX, valueX, "WAVE", waves[clamp(ins.synthWave, 0, 3)],
-                  "FILTER", ins.filterType, s.cursorRow, s.cursorColumn, 7, t);
+                  "SYNC", hex2(ins.synthSync), s.cursorRow, s.cursorColumn, 7, t);
     rowY += ROW_HEIGHT;
-    draw_dual_row(c, rowY, nameX, valueX, "FREQ", hex2(ins.filterCut), "RES",
-                  hex2(ins.filterRes), s.cursorRow, s.cursorColumn, 8, t);
+    draw_parameter_row(c, rowY, nameX, valueX, "FX", "EDIT >", false, s.cursorRow == 8, t);
     rowY += ROW_HEIGHT;
-    draw_triple_row(c, x, rowY, nameX, "REV", hex2(ins.reverbSend), "DEL",
-                    hex2(ins.delaySend), "CHO", hex2(ins.chorusSend),
-                    s.cursorRow, s.cursorColumn, 9, t);
-    rowY += ROW_HEIGHT;
-    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 10, t);
-    rowY += ROW_HEIGHT;
-    draw_dual_row(c, rowY, nameX, valueX, "DRIVE", hex2(ins.drive),
-                  "SYNC", hex2(ins.synthSync), s.cursorRow, s.cursorColumn, 11, t);
+    draw_eq_row(c, rowY, nameX, valueX, ins.eqSlot, "", "", s.cursorRow, s.cursorColumn, 9, t);
 }
 
 void InstrumentEditorModule::draw_external(Canvas& c, int x, int y,
@@ -472,24 +430,12 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
 
     if (s.type() == InstrumentType::SYNTH && s.cursorRow >= 7) {
         const int row = s.cursorRow, col = s.cursorColumn;
-        if (row == 7) {
-            if (col == 1) return cc::hex_byte(ins.synthWave, 0, 3);
-            if (col == 3) return cc::toggle_ternary(ins.filterType, filter_types());
-        }
-        if (row == 8) {
-            if (col == 1) return cc::hex_byte(ins.filterCut, 0, 255);
-            if (col == 3) return cc::hex_byte(ins.filterRes, 0, 255);
-        }
-        if (row == 9) {
-            if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255);
-            if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255);
-            if (col == 5) return cc::hex_byte(ins.chorusSend, 0, 255);
-        }
-        if (row == 10 && col == 1)
+        if (row == 7 && col == 1) return cc::hex_byte(ins.synthWave, 0, 3);
+        if (row == 7 && col == 3) return cc::hex_byte(ins.synthSync, 0, 255);
+        if (row == 8) return cc::read_only();
+        if (row == 9 && col == 1)
             return cc::hex_byte(ins.eqSlot < 0 ? 0 : ins.eqSlot, 0, 127, -1,
                                 ins.eqSlot >= 0, ins.eqSlot < 0);
-        if (row == 11 && col == 1) return cc::hex_byte(ins.drive, 0, 255);
-        if (row == 11 && col == 3) return cc::hex_byte(ins.synthSync, 0, 255);
         return cc::none();
     }
 
@@ -595,31 +541,7 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
 
     if (row == 6 + off) return cc::none();  // spacer
 
-    if (row == 7 + off) {  // DRIVE + FILTER
-        switch (col) {
-            case 1: return cc::hex_byte(ins.drive, 0, 255, -1, false, false, false, /*def=*/0x00);
-            case 3: return cc::toggle_ternary(ins.filterType, filter_types());
-            default: return cc::none();
-        }
-    }
-
-    if (row == 8 + off) {  // CRUSH + FREQ
-        switch (col) {
-            case 1: return cc::hex_nibble(ins.crush, /*def=*/0);
-            case 3: return cc::hex_byte(ins.filterCut, 0, 255, -1, false, false, false, /*def=*/0x00);
-            default: return cc::none();
-        }
-    }
-
-    if (row == 9 + off) {  // DWNSMPL + RES
-        switch (col) {
-            case 1: return cc::hex_nibble(ins.downsample, /*def=*/0);
-            case 3: return cc::hex_byte(ins.filterRes, 0, 255, -1, false, false, false, /*def=*/0x00);
-            default: return cc::none();
-        }
-    }
-
-    if (row == 10 + off) return cc::none();  // spacer
+    if (row == 7 + off) return cc::read_only();  // opens instrument FX
 
     /**
      * The EQ slot cell, shared by both tails. −1 is a genuine "no EQ", and A+B clears back to it.
@@ -643,32 +565,16 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
                             /*can_insert=*/ins.eqSlot < 0);
     };
 
-    if (sf) {
-        // 12 REV · 13 DEL · 14 EQ — one parameter each, so column 0 (the label) is read-only and any
-        // other column is the value.
-        if (row == 12) return (col == 0) ? cc::read_only()
-                                         : cc::hex_byte(ins.reverbSend, 0, 255, -1, false, false, false, 0x00);
-        if (row == 13) return (col == 0) ? cc::read_only()
-                                         : cc::hex_byte(ins.delaySend, 0, 255, -1, false, false, false, 0x00);
-        if (row == 14 && col == 1) return eq_context();
-        if (row == 14 && col == 3) return cc::hex_byte(ins.chorusSend, 0, 255);
-        return cc::none();
-    }
+    if (sf) return row == 9 && col == 1 ? eq_context() : cc::none();
 
     switch (row) {
-        case 11:  // REV + DEL
-            if (col == 1) return cc::hex_byte(ins.reverbSend, 0, 255, -1, false, false, false, 0x00);
-            if (col == 3) return cc::hex_byte(ins.delaySend, 0, 255, -1, false, false, false, 0x00);
-            if (col == 5) return cc::hex_byte(ins.chorusSend, 0, 255, -1, false, false, false, 0x00);
-            return cc::none();
-
-        case 12:  // EQ + SLICE
+        case 8:  // EQ + SLICE
             if (col == 1) return eq_context();
             if (col == 3) return cc::toggle_ternary(
                 slice_modes()[static_cast<size_t>(clamp(ins.slicingMode, 0, 2))], slice_modes());
             return cc::none();
 
-        case 13:  // LOOP + START
+        case 9:  // LOOP + START
             if (col == 1) {
                 CursorContext c = cc::toggle_ternary(ins.loopMode, loop_modes());
                 // A ceiling rather than a second, shorter list, so `loop_modes()` stays the one place
@@ -684,12 +590,12 @@ CursorContext InstrumentEditorModule::cursor_context(const InstrumentEditorState
             if (col == 3) return cc::hex_byte(ins.sampleStart, 0, 255, -1, false, false, false, 0x00);
             return cc::none();
 
-        case 14:  // LOOP ST + END
+        case 10:  // LOOP ST + END
             if (col == 1) return cc::hex_byte(ins.loopStart, 0, 255, -1, false, false, false, 0x00);
             if (col == 3) return cc::hex_byte(ins.sampleEnd, 0, 255, -1, false, false, false, 0xFF);
             return cc::none();
 
-        case 15:  // LOOP END + REVERSE
+        case 11:  // LOOP END + REVERSE
             if (col == 1) return cc::hex_byte(ins.loopEnd, 0, 255, -1, false, false, false, 0xFF);
             if (col == 3) return cc::toggle_binary(ins.reverse);
             return cc::none();
@@ -715,47 +621,11 @@ songcore::MapTarget InstrumentEditorModule::map_target(const InstrumentEditorSta
         return {};
     }
 
-    if (s.type() == InstrumentType::SYNTH && row >= 7) {
-        if (row == 8 && col == 1) return {MapDestId::INS_CUT, 0};
-        if (row == 8 && col == 3) return {MapDestId::INS_RES, 0};
-        if (row == 9 && col == 1) return {MapDestId::INS_REV, 0};
-        if (row == 9 && col == 3) return {MapDestId::INS_DLY, 0};
-        if (row == 11 && col == 1) return {MapDestId::INS_DRIVE, 0};
-        return {};
-    }
-
-    const bool sf  = s.is_soundfont();
-    const int  off = sf ? 1 : 0;   // the SoundFont's PATCH row pushes everything below it down
-
     if (row == 2 && col == 3) return {MapDestId::INS_DETUNE, 0};
     if (row == 3) {
         if (col == 1) return {MapDestId::INS_VOL, 0};
         if (col == 5) return {MapDestId::INS_PAN, 0};   // column 3 is TSP, a switch
         return {};
-    }
-    if (row == 7 + off && col == 1) return {MapDestId::INS_DRIVE, 0};   // column 3 is the filter TYPE
-    if (row == 8 + off) {
-        if (col == 1) return {MapDestId::INS_CRUSH, 0};
-        if (col == 3) return {MapDestId::INS_CUT, 0};
-        return {};
-    }
-    if (row == 9 + off) {
-        if (col == 1) return {MapDestId::INS_DWN, 0};
-        if (col == 3) return {MapDestId::INS_RES, 0};
-        return {};
-    }
-
-    // The two sends. On a SoundFont they are a row each and the value is any column but the label's;
-    // on a sampler they share one row. Below them both layouts are EQ, slices and the loop window —
-    // slots and boundaries, not values a knob sweeps.
-    if (sf) {
-        if (row == 12 && col != 0) return {MapDestId::INS_REV, 0};
-        if (row == 13 && col != 0) return {MapDestId::INS_DLY, 0};
-        return {};
-    }
-    if (row == 11) {
-        if (col == 1) return {MapDestId::INS_REV, 0};
-        if (col == 3) return {MapDestId::INS_DLY, 0};
     }
     return {};
 }
@@ -766,36 +636,21 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
                                                            const InputAction& action) const {
     InstrumentInputResult r;
     const bool sf  = (ins.instrumentType == InstrumentType::SOUNDFONT);
-    const int  off = sf ? 1 : 0;
 
     const bool isSet = (action.type == ActionType::SET_VALUE);
     const int  v     = action.value;
 
     const auto b255 = [&](int& field) { if (isSet) field = clamp(v, 0, 255); };
-    const auto b15  = [&](int& field) { if (isSet) field = clamp(v, 0, 15); };
 
     if (ins.instrumentType == InstrumentType::SYNTH && row >= 7) {
-        if (row == 7) {
-            if (col == 1 && isSet) ins.synthWave = clamp(v, 0, 3);
-            if (col == 3 && isSet && v >= 0 && v < static_cast<int>(filter_types().size()))
-                ins.filterType = filter_types()[static_cast<size_t>(v)];
-        } else if (row == 8) {
-            if (col == 1) b255(ins.filterCut);
-            if (col == 3) b255(ins.filterRes);
-        } else if (row == 9) {
-            if (col == 1) b255(ins.reverbSend);
-            if (col == 3) b255(ins.delaySend);
-            if (col == 5) b255(ins.chorusSend);
-        } else if (row == 10 && col == 1) {
+        if (row == 7 && col == 1 && isSet) ins.synthWave = clamp(v, 0, 3);
+        else if (row == 7 && col == 3) b255(ins.synthSync);
+        else if (row == 9 && col == 1) {
             if (isSet) ins.eqSlot = clamp(v, 0, 127);
             else if (action.type == ActionType::DELETE) ins.eqSlot = -1;
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;
-        } else if (row == 11 && col == 1) {
-            b255(ins.drive);
-        } else if (row == 11 && col == 3) {
-            b255(ins.synthSync);
-        }
-        r.modified = (action.type != ActionType::NONE);
+        } else return r;
+        r.modified = action.type != ActionType::NONE;
         return r;
     }
 
@@ -861,30 +716,9 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
             r.presetIndex        = v;
         }
 
-    } else if (row == 7 + off) {
-        if (col == 1) b255(ins.drive);
-        else if (col == 3 && isSet && v >= 0 && v < static_cast<int>(filter_types().size()))
-            ins.filterType = filter_types()[static_cast<size_t>(v)];
-
-    } else if (row == 8 + off) {
-        if (col == 1) b15(ins.crush);
-        else if (col == 3) b255(ins.filterCut);
-
-    } else if (row == 9 + off) {
-        if (col == 1) b15(ins.downsample);
-        else if (col == 3) b255(ins.filterRes);
-
-    } else if (sf && row == 12) {
-        b255(ins.reverbSend);
-    } else if (sf && row == 13) {
-        b255(ins.delaySend);
-    } else if ((sf && row == 14) || (!sf && row == 12)) {
-        // ⚠️ On a SAMPLER, SLICE shares this row, so the EQ arm is no longer the whole row — an edit
-        // that ignored the column would write an EQ slot of 0, 1 or 2 every time SLICE was cycled.
-        // The SoundFont has no second column here and falls into the EQ half for any column.
-        if (col == 3) {
-            if (sf) b255(ins.chorusSend);
-            else if (isSet) ins.slicingMode = clamp(v, 0, 2);
+    } else if ((sf && row == 9) || (!sf && row == 8)) {
+        if (col == 3 && !sf) {
+            if (isSet) ins.slicingMode = clamp(v, 0, 2);
         } else {
             // The EQ slot. −1 is "no EQ", so DELETE clears to it and INSERT lands on slot 0.
             if (isSet)                                       ins.eqSlot = clamp(v, 0, 127);
@@ -892,21 +726,16 @@ InstrumentInputResult InstrumentEditorModule::handle_input(Instrument& ins, int 
             else if (action.type == ActionType::INSERT_DEFAULT) ins.eqSlot = 0;
         }
 
-    } else if (!sf && row == 11) {
-        if (col == 1) b255(ins.reverbSend);
-        else if (col == 3) b255(ins.delaySend);
-        else if (col == 5) b255(ins.chorusSend);
-
-    } else if (!sf && row == 13) {
+    } else if (!sf && row == 9) {
         if (col == 1 && isSet && v >= 0 && v < static_cast<int>(loop_modes().size()))
             ins.loopMode = loop_modes()[static_cast<size_t>(v)];
         else if (col == 3) b255(ins.sampleStart);
 
-    } else if (!sf && row == 14) {
+    } else if (!sf && row == 10) {
         if (col == 1) b255(ins.loopStart);
         else if (col == 3) b255(ins.sampleEnd);
 
-    } else if (!sf && row == 15) {
+    } else if (!sf && row == 11) {
         if (col == 1) b255(ins.loopEnd);
         else if (col == 3 && isSet) ins.reverse = (v == 1);
     }

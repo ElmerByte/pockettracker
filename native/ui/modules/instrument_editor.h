@@ -13,32 +13,16 @@
 // inside a rectangle. This screen is a FORM: rows hold one, two or three parameters, some rows are
 // unreachable spacers, some are buttons rather than values, and THE ROW LIST ITSELF DEPENDS ON THE
 // INSTRUMENT TYPE — a SoundFont gains a PATCH row and loses the four sample-window rows, so every row
-// below the source section shifts by one (`sf_offset`).
+// below the source section shifts by one.
 //
 // The row geometry therefore lives in ONE place — ui/instrument_row_layout.h — which the cursor walks
 // and this module draws. They must agree: a row added here without an entry there strands the cursor
 // on a spacer or skips a live row. (Kotlin learned that the hard way; the table exists because the
 // same geometry was once re-encoded at four movement sites.)
 //
-// ── ROWS ─────────────────────────────────────────────────────────────────────────────────────────
-//
-//   SAMPLER (16)                          SOUNDFONT (15)               EXTERNAL (12)
-//    0  TYPE + LOAD + EDIT                 0  TYPE + LOAD               0  TYPE
-//    1  NAME                               1  NAME                      1  NAME
-//    2  ROOT + DETUNE + TIC                2  ROOT + DETUNE + TIC       2  CHAN + BANK
-//    3  VOL + SLICE + PAN                  3  VOL + PAN                 3  PROG + LEN
-//    4  ·spacer·                           4  ·spacer·                  4  ·spacer·
-//    5  INST PRESET: SAVE | LOAD           5  INST PRESET: SAVE | LOAD  5  INST PRESET: SAVE | LOAD
-//    6  ·spacer·                           6  PATCH                     6  ·spacer·
-//    7  DRIVE + FILTER                     7  ·spacer·                  7  VOL + PAN
-//    8  CRUSH + FREQ                       8  DRIVE + FILTER            8  CC A + value
-//    9  DWNSMPL + RES                      9  CRUSH + FREQ              9  CC B + value
-//   10  ·spacer·                          10  DWNSMPL + RES            10  CC C + value
-//   11  REV + DEL                         11  ·spacer·                 11  CC D + value
-//   12  EQ                                12  REV
-//   13  LOOP + START                      13  DEL
-//   14  LOOP ST + END                     14  EQ
-//   15  LOOP END + REVERSE
+// Sampler, SoundFont and synth keep source and performance controls here. The FX button opens
+// the per-instrument DSP and send controls in InstrumentFxEditorModule. Row numbers are defined
+// by instrument_row_layout.h; EXTERNAL retains its MIDI-only form.
 //
 // The TYPE row's LOAD/EDIT load and edit the SOURCE (sample or SF2); the INST PRESET row's SAVE/LOAD
 // write and read the whole instrument as a .pti — the two used to share row 0 as one confusing pair of
@@ -145,8 +129,8 @@ public:
      * is therefore half a target.
      *
      * ⚠️⚠️ **THE TYPE SELECTS THE ROW MAP, AND THAT IS THE WHOLE REASON THIS FUNCTION EXISTS.** A
-     * SoundFont's PATCH row pushes everything below it down by one, so row 12 is `EQ + SLICE` on a
-     * sampler and `REV` on a SoundFont. A mapping stored as a row number would point at a different
+     * SoundFont's PATCH row pushes everything below it down by one, so the FX and EQ rows differ between
+     * sampler and SoundFont. A mapping stored as a row number would point at a different
      * knob after a type change, silently.
      */
     songcore::MapTarget map_target(const InstrumentEditorState& s) const;

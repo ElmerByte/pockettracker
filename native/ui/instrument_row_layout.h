@@ -38,43 +38,25 @@ namespace pt::ui {
 
 enum class InstrumentRowKind { NAME, TRIPLE, DUAL, SOURCE, SINGLE, SPACER };
 
-/** Sampler: 16 rows. */
+/** Common header and preset buttons, followed by FX and source-specific controls. */
 inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SAMPLER[] = {
-    InstrumentRowKind::NAME,    //  0  TYPE + source LOAD + EDIT
-    InstrumentRowKind::SINGLE,  //  1  NAME
-    InstrumentRowKind::TRIPLE,  //  2  ROOT + DETUNE + TIC
-    InstrumentRowKind::TRIPLE,  //  3  VOL + TSP + PAN
-    InstrumentRowKind::SPACER,  //  4
-    InstrumentRowKind::SOURCE,  //  5  INST PRESET: SAVE / LOAD (.pti)
-    InstrumentRowKind::SPACER,  //  6
-    InstrumentRowKind::DUAL,    //  7  DRIVE + FILTER
-    InstrumentRowKind::DUAL,    //  8  CRUSH + FREQ
-    InstrumentRowKind::DUAL,    //  9  DWNSMPL + RES
-    InstrumentRowKind::SPACER,  // 10
-    InstrumentRowKind::TRIPLE,  // 11  REV + DEL + CHO
-    InstrumentRowKind::DUAL,    // 12  EQ + SLICE
-    InstrumentRowKind::DUAL,    // 13  LOOP + START
-    InstrumentRowKind::DUAL,    // 14  LOOP ST + END
-    InstrumentRowKind::DUAL,    // 15  LOOP END + REVERSE
+    InstrumentRowKind::NAME, InstrumentRowKind::SINGLE,
+    InstrumentRowKind::TRIPLE, InstrumentRowKind::TRIPLE,
+    InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
+    InstrumentRowKind::SPACER, InstrumentRowKind::SINGLE, // FX
+    InstrumentRowKind::DUAL, // EQ + SLICE
+    InstrumentRowKind::DUAL, // LOOP + START
+    InstrumentRowKind::DUAL, // LOOP ST + END
+    InstrumentRowKind::DUAL, // LOOP END + REVERSE
 };
 
-/** SoundFont: 15 rows. It gains PATCH and loses the four sample-window rows. */
 inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SOUNDFONT[] = {
-    InstrumentRowKind::NAME,    //  0  TYPE + source LOAD (no EDIT on SF)
-    InstrumentRowKind::SINGLE,  //  1  NAME
-    InstrumentRowKind::TRIPLE,  //  2  ROOT + DETUNE + TIC
-    InstrumentRowKind::TRIPLE,  //  3  VOL + TSP + PAN
-    InstrumentRowKind::SPACER,  //  4
-    InstrumentRowKind::SOURCE,  //  5  INST PRESET: SAVE / LOAD (.pti)
-    InstrumentRowKind::SINGLE,  //  6  PATCH (the SF2's internal patch selector)
-    InstrumentRowKind::SPACER,  //  7
-    InstrumentRowKind::DUAL,    //  8  DRIVE + FILTER
-    InstrumentRowKind::DUAL,    //  9  CRUSH + FREQ
-    InstrumentRowKind::DUAL,    // 10  DWNSMPL + RES
-    InstrumentRowKind::SPACER,  // 11
-    InstrumentRowKind::SINGLE,  // 12  REV
-    InstrumentRowKind::SINGLE,  // 13  DEL
-    InstrumentRowKind::DUAL,    // 14  EQ + CHO
+    InstrumentRowKind::NAME, InstrumentRowKind::SINGLE,
+    InstrumentRowKind::TRIPLE, InstrumentRowKind::TRIPLE,
+    InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
+    InstrumentRowKind::SINGLE, // PATCH
+    InstrumentRowKind::SPACER, InstrumentRowKind::SINGLE, // FX
+    InstrumentRowKind::SINGLE, // EQ
 };
 
 /**
@@ -114,10 +96,9 @@ inline constexpr InstrumentRowKind INSTRUMENT_ROWS_SYNTH[] = {
     InstrumentRowKind::NAME, InstrumentRowKind::SINGLE,
     InstrumentRowKind::TRIPLE, InstrumentRowKind::TRIPLE,
     InstrumentRowKind::SPACER, InstrumentRowKind::SOURCE,
-    InstrumentRowKind::SPACER, InstrumentRowKind::DUAL,
-    InstrumentRowKind::DUAL, InstrumentRowKind::TRIPLE,
-    InstrumentRowKind::SINGLE,
-    InstrumentRowKind::DUAL, // DRIVE + SYNC
+    InstrumentRowKind::SPACER, InstrumentRowKind::DUAL, // WAVE + SYNC
+    InstrumentRowKind::SINGLE, // FX
+    InstrumentRowKind::SINGLE, // EQ
 };
 
 inline constexpr int INSTRUMENT_ROWS_SAMPLER_COUNT =
@@ -188,33 +169,25 @@ inline int instrument_sf_offset(songcore::InstrumentType type) {
     return type == songcore::InstrumentType::SOUNDFONT ? 1 : 0;
 }
 
-/**
- * The EQ row — 12 on a sampler, 14 on a SoundFont (the two extra rows above it are PATCH and the four
- * sample-window rows the SF layout drops, netting +2). Its column 1 is the cell that raises the EQ
- * EDITOR (S8). **−1 on EXTERNAL, which has no EQ row** — there is no signal of ours to equalise — and
- * −1 is a row number no cursor can hold, so the callers' `cursorRow == instrument_eq_row(...)` test
- * goes false without a second condition to forget at each site.
- *
- * Named here rather than open-coded at the three sites that need it, because it is a NUMBER READ OFF
- * THE TABLE ABOVE and the table is what moves. Kotlin writes the literals `12` and `14` into
- * `openSubScreenAtCursor` and `handleSelect` and its own module, which is three places to forget when a
- * row is inserted — and S5 already found the shape of that bug once (`go_to_screen` silently skipping
- * the three screens S4 added).
- */
+/** The FX button is absent on EXTERNAL, which has no internal audio signal. */
+inline int instrument_fx_row(songcore::InstrumentType type) {
+    if (type == songcore::InstrumentType::EXTERNAL) return -1;
+    return type == songcore::InstrumentType::SAMPLER ? 7 : 8;
+}
+
 /**
  * ⚠️ On a SAMPLER the EQ row is a DUAL — its second column is `SLICE`, which moved down here when
  * `TSP` took its place beside VOL. On a SoundFont it stays a SINGLE: there are no slices to put
- * there. The row NUMBER is unchanged on both, which is what mattered — it is identity (this function,
- * and the dispatcher site that tests it) where a column is free.
+ * there. This helper follows the compact layout and is shared with the EQ opening gesture.
  */
 inline int instrument_eq_row(songcore::InstrumentType type) {
     switch (type) {
-        case songcore::InstrumentType::SOUNDFONT: return 14;
+        case songcore::InstrumentType::SOUNDFONT: return 9;
         case songcore::InstrumentType::EXTERNAL:  return -1;
-        case songcore::InstrumentType::SYNTH:     return 10;
+        case songcore::InstrumentType::SYNTH:     return 9;
         case songcore::InstrumentType::SAMPLER:   break;
     }
-    return 12;
+    return 8;
 }
 
 }  // namespace pt::ui

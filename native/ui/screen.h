@@ -37,7 +37,8 @@ enum class ScreenType {
     // grid read these by name while `ptdispatch`/`ptshot` name them in TEXT — so the ordering is free
     // and the append is merely the habit that keeps it free.
     MIDI,       // reached from PROJECT > MIDI; not on the R+DPAD grid (plan §8.1)
-    MIDI_MAP    // …and one level further in, from MIDI > MAPPING. Not on the grid either
+    MIDI_MAP,   // …and one level further in, from MIDI > MAPPING. Not on the grid either
+    INSTRUMENT_FX // reached from the instrument's FX button
 };
 
 inline const char* screen_label(ScreenType s) {
@@ -58,6 +59,7 @@ inline const char* screen_label(ScreenType s) {
         case ScreenType::SETTINGS:      return "SETTINGS";
         case ScreenType::SAMPLE_EDITOR: return "SAMPLE EDITOR";
         case ScreenType::ENVELOPE_EDITOR: return "ENVELOPE EDITOR";
+        case ScreenType::INSTRUMENT_FX: return "INSTRUMENT FX";
         case ScreenType::MIDI:          return "MIDI";
         case ScreenType::MIDI_MAP:      return "MIDI MAPPING";
     }
@@ -89,6 +91,7 @@ inline const char* screen_short_label(ScreenType s) {
         case ScreenType::SETTINGS:      return "SE";
         case ScreenType::SAMPLE_EDITOR: return "SE";
         case ScreenType::ENVELOPE_EDITOR: return "ENV";
+        case ScreenType::INSTRUMENT_FX: return "FX";
         case ScreenType::MIDI:          return "MI";
         case ScreenType::MIDI_MAP:      return "MM";
     }

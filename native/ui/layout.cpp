@@ -91,6 +91,10 @@ void TrackerLayout::draw_frame(Canvas& c, const AppState& s) {
     if (full_screen_module(s)) {
         if (s.currentScreen == ScreenType::FILE_BROWSER) {
             fileBrowser_.draw(c, 0, 0, s.fileBrowser, t);
+        } else if (s.currentScreen == ScreenType::INSTRUMENT_FX) {
+            instrumentFxEditor_.draw(c, s.project->instruments[static_cast<size_t>(s.currentInstrument)],
+                                     s.instrumentFxCursor, t);
+            if (s.helpOpen) helpPanel_.draw(c, SIDE_SPACER, 390, help_topic(s), t, 80);
         } else if (s.currentScreen == ScreenType::ENVELOPE_EDITOR) {
             envelopeEditor_.draw(c, s.project->instruments[static_cast<size_t>(s.currentInstrument)],
                                  s.envelopeSlot, s.envelopeCursor, t);
