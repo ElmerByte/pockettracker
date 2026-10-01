@@ -1080,10 +1080,22 @@ void AudioEngine::renderMetronome(float* output, int numFrames, int channelCount
         metroBeatFrames_ = beat;
     }
 
-    if (!metronomeOn.load(std::memory_order_relaxed)) { metroClickPos_ = -1; return; }
-    const float gain = metronomeGain.load(std::memory_order_relaxed);
-    if (gain <= 0.0f) { metroClickPos_ = -1; return; }
     if (metroEpoch_ < 0 || metroBeatFrames_ <= 0) return;   // nothing is playing
+
+    // ⚠️ The grid walks while the click is silent, so turning it on mid-take waits for the next beat
+    // instead of clicking at once for the one it passed while off.
+    const float gain = metronomeOn.load(std::memory_order_relaxed)
+                     ? metronomeGain.load(std::memory_order_relaxed) : 0.0f;
+    if (gain <= 0.0f) {
+        metroClickPos_ = -1;
+        const int64_t ahead = blockStartFrame + numFrames - (metroEpoch_ + metroIndex_ * metroBeatFrames_);
+        if (ahead > 0) {
+            const int64_t passed = (ahead + metroBeatFrames_ - 1) / metroBeatFrames_;
+            metroIndex_ += passed;
+            metroCount_ += passed;
+        }
+        return;
+    }
 
     // ⚠️ The audio device can STALL AND RESUME — an Android suspend, a CFW power menu — and the frame
     // counter then jumps by the whole stall at once. Walking the backlog one beat at a time would fire
