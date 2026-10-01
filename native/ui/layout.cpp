@@ -539,35 +539,34 @@ void TrackerLayout::draw_right_bar(Canvas& c, const AppState& s) const {
     const Theme&             t = s.theme;
     const songcore::Project& p = *s.project;
 
-    // The BPM row lines up with the COLUMN HEADER row of every editor, and is derived rather than
-    // written down so it cannot drift from them: an editor lays out a title row (21px) then a 14px
-    // spacer, putting its column headers at EDITOR_Y + 35 — which is 117.
-    const int bpmRowY  = EDITOR_Y + ROW_HEIGHT + 14;  // 117
-    const int bpmTextY = bpmRowY + TEXT_PADDING;      // 120
+    const int x = RIGHT_BAR_X + 8;
+    const int width = NavigationMapModule::WIDTH - 16;
+    c.fill_rect(RIGHT_BAR_X, EDITOR_Y, NavigationMapModule::WIDTH,
+                DESIGN_H - EDITOR_Y - SCREEN_SPACER, t.vizBackground);
+    c.draw_text("TEMPO", x, EDITOR_Y + TEXT_PADDING, t.textParam, CHAR_SPACING, FONT_SCALE);
+    c.draw_text(std::to_string(p.tempo), x, EDITOR_Y + ROW_HEIGHT + TEXT_PADDING,
+                t.textValue, CHAR_SPACING, FONT_SCALE);
+    c.fill_rect(x, EDITOR_Y + ROW_HEIGHT * 2 + 7, width, 1, t.textEmpty);
 
-    c.draw_text("T>", RIGHT_BAR_X + 2, bpmTextY, t.textEmpty, CHAR_SPACING, FONT_SCALE);
-    c.draw_text(std::to_string(p.tempo), RIGHT_BAR_X + 2 + 34, bpmTextY, t.textValue, CHAR_SPACING,
-                FONT_SCALE);
-
-    // The note monitor: one blank row below the BPM, then the 8 tracks. "1  C-4" — the track number
-    // dim, the note bright while it sounds.
-    const int trackRowsStartY = bpmRowY + ROW_HEIGHT + ROW_HEIGHT;  // 159
+    const int trackRowsStartY = EDITOR_Y + ROW_HEIGHT * 3;
     for (int i = 0; i < 8; ++i) {
-        const int            textY = trackRowsStartY + (i * ROW_HEIGHT) + TEXT_PADDING;
-        const songcore::Note note  = s.trackNotes[i];
-        const bool           empty = (note == songcore::Note::EMPTY());
-
-        c.draw_text(std::to_string(i + 1), RIGHT_BAR_X + 2, textY, t.textParam, CHAR_SPACING,
-                    FONT_SCALE);
-        c.draw_text(note_name(note), RIGHT_BAR_X + 2 + 34, textY, empty ? t.textEmpty : t.textValue,
+        const int textY = trackRowsStartY + i * ROW_HEIGHT + TEXT_PADDING;
+        const songcore::Note note = s.trackNotes[i];
+        c.draw_text(std::to_string(i + 1), x, textY, t.textParam, CHAR_SPACING, FONT_SCALE);
+        c.draw_text(note_name(note), x + 34, textY,
+                    note == songcore::Note::EMPTY() ? t.textEmpty : t.textValue,
                     CHAR_SPACING, FONT_SCALE);
     }
+    const int navY = DESIGN_H - NavigationMapModule::HEIGHT - SCREEN_SPACER;
+    c.draw_text("NAV", x, navY - ROW_HEIGHT - 8, t.textParam, CHAR_SPACING, FONT_SCALE);
+    c.fill_rect(x, navY - 7, width, 1, t.textEmpty);
 
     NavigationMapState ns;
     ns.currentScreen      = s.currentScreen;
     ns.sourceColumn       = s.previousColumn;
     ns.instrumentFromPool = s.instrumentFromPool;
     ns.theme              = t;
+    ns.theme.background   = t.vizBackground;
     navigationMap_.draw(c, RIGHT_BAR_X, DESIGN_H - NavigationMapModule::HEIGHT - SCREEN_SPACER, ns);
 }
 
